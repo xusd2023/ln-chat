@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>微信风格社区 - 聊天/通讯录/帖子</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <style>
+        /* ===== CSS Variables & Reset ===== */
+        :root {
+            --primary: #07c160;
+            --primary-dark: #05a14e;
+            --primary-light: #e6f9ee;
+            --accent: #667eea;
+            --accent-dark: #5a6fd6;
+            --danger: #ff4d4f;
+            --warning: #faad14;
+            --bg-main: #f0f2f5;
+            --bg-white: #ffffff;
+            --bg-sidebar: #f8f8fa;
+            --bg-hover: #e8e8e8;
+            --bg-active: #d9d9d9;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-tertiary: #999999;
+            --border-color: #e8e8e8;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 2px 8px rgba(0,0,0,0.1);
+            --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+            --shadow-xl: 0 8px 30px rgba(0,0,0,0.18);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 18px;
+            --radius-xl: 24px;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, Helvetica, sans-serif;
+            background: var(--bg-main);
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+
+        /* ===== App Layout ===== */
+        .app {
+            display: flex;
+            height: 100vh;
+            max-width: 1440px;
+            margin: 0 auto;
+            background: var(--bg-white);
+            box-shadow: var(--shadow-xl);
+            position: relative;
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar {
+            width: 300px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+
+        .sidebar-header {
+            padding: 16px 18px;
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-header h2 {
+            font-size: 17px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), #38d98e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 0.5px;
+        }
+
+        .logout-btn {
+            background: none;
+            border: 1.5px solid var(--border-color);
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: var(--radius-xl);
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        .logout-btn:hover { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+
+        /* ===== Tabs ===== */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-white);
+            padding: 0 8px;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 13px 0;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            position: relative;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+        .tab::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 3px;
+            background: var(--primary);
+            border-radius: 2px 2px 0 0;
+            transition: var(--transition);
+        }
+        .tab.active { color: var(--primary); font-weight: 600; }
+        .tab.active::after { width: 60%; }
+        .tab:hover { color: var(--primary); background: var(--primary-light); }
+
+        /* ===== Lists ===== */
+        .conv-list, .contact-list, .post-list {
+            flex: 1; overflow-y: auto; display: none;
+        }
+        .conv-list.active, .contact-list.active, .post-list.active { display: block; }
+
+        .conv-item, .contact-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: var(--transition);
+            position: relative;
+        }
+        .conv-item:hover, .contact-item:hover { background: var(--bg-hover); }
+        .conv-item.active, .contact-item.active { background: var(--bg-active); }
+
+        .conv-item::before, .contact-item::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: var(--primary);
+            border-radius: 0 2px 2px 0;
+            opacity: 0;
+            transition: var(--transition);
+        }
+        .conv-item.active::before, .contact-item.active::before { opacity: 1; }
+
+        /* ===== Avatars ===== */
+        .conv-avatar, .contact-avatar {
+            width: 46px; height: 46px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin-right: 12px;
+            font-size: 20px; color: white;
+            flex-shrink: 0;
+            box-shadow: var(--shadow-sm);
+        }
+        .conv-avatar { background: linear-gradient(135deg, var(--primary), #38d98e); }
+        .contact-avatar { background: linear-gradient(135deg, #9b59b6, #c39bd3); }
+
+        .conv-info, .contact-info { flex: 1; min-width: 0; }
+        .conv-name, .contact-name { font-weight: 600; margin-bottom: 3px; font-size: 14px; }
+        .conv-preview, .contact-username {
+            font-size: 12px; color: var(--text-tertiary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* ===== Search ===== */
+        .search-box {
+            padding: 10px 14px;
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .search-input {
+            width: 100%;
+            padding: 9px 14px 9px 36px;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-xl);
+            font-size: 13px;
+            outline: none;
+            background: var(--bg-sidebar) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%23999' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/%3E%3C/svg%3E") no-repeat 12px center;
+            transition: var(--transition);
+            color: var(--text-primary);
+        }
+        .search-input:focus {
+            border-color: var(--primary);
+            background-color: var(--bg-white);
+            box-shadow: 0 0 0 3px rgba(7,193,96,0.12);
+        }
+        .search-input::placeholder { color: #bbb; }
+
+        /* ===== Chat Area ===== */
+        .chat-area {
+            flex: 1; display: flex; flex-direction: column;
+            background: linear-gradient(180deg, #f0f2f5 0%, #e8eaed 100%);
+            position: relative;
+        }
+        .chat-area::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23cccccc' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30v4h-2V6h-4V4h4V0h2v4h4v2h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .chat-header {
+            height: 60px;
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-weight: 700; font-size: 16px;
+            position: relative; z-index: 1;
+            box-shadow: var(--shadow-sm);
+        }
+        .group-settings {
+            font-size: 13px; font-weight: 500;
+            cursor: pointer; color: var(--primary);
+            transition: var(--transition);
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+        }
+        .group-settings:hover { background: var(--primary-light); }
+        .user-info { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+
+        /* ===== Messages ===== */
+        .message-list {
+            flex: 1; overflow-y: auto; padding: 20px 24px;
+            display: flex; flex-direction: column; gap: 6px;
+            position: relative; z-index: 1;
+        }
+
+        .message-wrapper { display: flex; width: 100%; margin-bottom: 4px; animation: msgIn 0.3s ease; }
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .align-left { justify-content: flex-start; }
+        .align-center { justify-content: center; }
+        .align-right { justify-content: flex-end; }
+
+        .message-bubble {
+            max-width: 68%;
+            background: var(--bg-white);
+            border-radius: var(--radius-lg);
+            padding: 10px 16px;
+            box-shadow: var(--shadow-sm);
+            word-wrap: break-word;
+            position: relative;
+            transition: var(--transition);
+            line-height: 1.6;
+        }
+        .align-left .message-bubble { border-top-left-radius: 6px; }
+        .align-right .message-bubble {
+            background: linear-gradient(135deg, #d9f0c3, #c8e6b8);
+            border-top-right-radius: 6px;
+        }
+        .align-center .message-bubble {
+            background: #f0f0f0;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .message-bubble:hover { box-shadow: var(--shadow-md); }
+
+        .message-meta {
+            font-size: 11px; color: var(--text-tertiary);
+            margin-top: 5px;
+            display: flex; gap: 8px; align-items: center;
+        }
+        .message-content p { margin: 4px 0; line-height: 1.6; }
+        .message-content img { max-width: 100%; border-radius: var(--radius-sm); margin: 4px 0; }
+        .message-content pre {
+            background: #f5f5f5; padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            overflow-x: auto; font-size: 13px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* ===== Attachments ===== */
+        .attachments-area { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .attachment-item {
+            background: #f4f6f8;
+            border-radius: var(--radius-sm);
+            padding: 7px 12px;
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 12px; cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
+        }
+        .attachment-item:hover { background: #e8ecf0; border-color: var(--primary); color: var(--primary); }
+        .attachment-img-preview {
+            width: 80px; height: 80px; object-fit: cover;
+            border-radius: var(--radius-sm);
+            cursor: pointer; transition: var(--transition);
+            border: 2px solid transparent;
+        }
+        .attachment-img-preview:hover { transform: scale(1.05); border-color: var(--primary); box-shadow: var(--shadow-md); }
+
+        /* ===== Input Area ===== */
+        .input-area {
+            background: var(--bg-white);
+            border-top: 1px solid var(--border-color);
+            padding: 12px 18px 14px;
+            position: relative; z-index: 1;
+        }
+        .toolbar {
+            display: flex; gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .tool-btn {
+            background: none; border: none;
+            font-size: 18px; cursor: pointer;
+            color: var(--text-secondary);
+            padding: 6px 8px;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+        }
+        .tool-btn:hover { color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
+
+        .align-selector {
+            display: flex; gap: 4px;
+            background: var(--bg-sidebar);
+            padding: 3px 6px;
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-color);
+        }
+        .align-btn {
+            background: none; border: none;
+            cursor: pointer; font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 16px;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        .align-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(7,193,96,0.3); }
+
+        .text-input {
+            width: 100%;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 10px 16px;
+            font-size: 14px;
+            resize: none;
+            font-family: inherit;
+            outline: none;
+            transition: var(--transition);
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+        .text-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(7,193,96,0.12); }
+        .text-input::placeholder { color: #bbb; }
+
+        .send-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none; color: white;
+            padding: 8px 22px;
+            border-radius: var(--radius-xl);
+            margin-top: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 14px;
+            transition: var(--transition);
+            box-shadow: 0 2px 8px rgba(7,193,96,0.3);
+            float: right;
+        }
+        .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(7,193,96,0.4); }
+        .send-btn:active { transform: translateY(0); }
+
+        /* ===== File List ===== */
+        .file-list {
+            margin-top: 8px;
+            background: #fafbfc;
+            border-radius: var(--radius-md);
+            padding: 8px 12px;
+            font-size: 12px;
+            border: 1px dashed var(--border-color);
+        }
+        .file-tag {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: var(--primary-light);
+            margin: 3px; padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 12px; color: var(--text-primary);
+            border: 1px solid #c8e6d9;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        /* ===== Badge ===== */
+        .badge {
+            background: linear-gradient(135deg, var(--danger), #ff7875);
+            color: white;
+            border-radius: 12px;
+            padding: 0 7px;
+            font-size: 10px;
+            margin-left: 6px;
+            font-weight: 700;
+            box-shadow: 0 1px 3px rgba(255,77,79,0.3);
+        }
+
+        /* ===== Modal ===== */
+        .modal {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(6px);
+            animation: modalBgIn 0.25s ease;
+        }
+        @keyframes modalBgIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-content {
+            background: var(--bg-white);
+            border-radius: var(--radius-xl);
+            width: 800px; max-width: 92%;
+            max-height: 88%;
+            overflow-y: auto;
+            padding: 24px 28px;
+            box-shadow: var(--shadow-xl);
+            animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.92) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        /* ===== Image Preview ===== */
+        .image-preview-modal {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.88);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2000; cursor: pointer;
+            backdrop-filter: blur(10px);
+            animation: modalBgIn 0.2s ease;
+        }
+        .image-preview-modal img {
+            max-width: 90%; max-height: 90%;
+            object-fit: contain;
+            border-radius: var(--radius-md);
+            box-shadow: 0 0 60px rgba(255,255,255,0.08);
+            animation: modalIn 0.3s ease;
+        }
+        .image-preview-modal .close-btn {
+            position: absolute; top: 20px; right: 30px;
+            font-size: 38px; color: white;
+            cursor: pointer; background: none; border: none;
+            transition: var(--transition);
+            opacity: 0.7;
+        }
+        .image-preview-modal .close-btn:hover { opacity: 1; transform: scale(1.15); }
+
+        /* ===== Auth Screen ===== */
+        .auth-container {
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .auth-container::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='40' cy='40' r='20'/%3E%3C/g%3E%3C/svg%3E");
+        }
+        .auth-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: var(--radius-xl);
+            padding: 40px 36px;
+            width: 400px; max-width: 92%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            animation: authCardIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes authCardIn { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        .auth-tabs { display: flex; gap: 16px; margin-bottom: 28px; border-bottom: 2px solid var(--border-color); padding-bottom: 2px; }
+        .auth-tab {
+            flex: 1; padding: 10px 0;
+            cursor: pointer; font-size: 17px;
+            font-weight: 500; color: var(--text-tertiary);
+            transition: var(--transition);
+            position: relative;
+        }
+        .auth-tab::after {
+            content: ''; position: absolute;
+            bottom: -4px; left: 50%; transform: translateX(-50%);
+            width: 0; height: 3px;
+            background: var(--primary);
+            border-radius: 2px; transition: var(--transition);
+        }
+        .auth-tab.active { color: var(--primary); font-weight: 700; }
+        .auth-tab.active::after { width: 80%; }
+
+        .auth-form { display: flex; flex-direction: column; gap: 16px; }
+        .auth-input {
+            padding: 12px 16px;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-xl);
+            font-size: 15px; outline: none;
+            transition: var(--transition);
+            background: #fafbfc;
+            color: var(--text-primary);
+        }
+        .auth-input:focus { border-color: var(--primary); background: var(--bg-white); box-shadow: 0 0 0 3px rgba(7,193,96,0.12); }
+        .auth-input::placeholder { color: #bbb; }
+
+        .auth-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white; border: none;
+            padding: 12px;
+            border-radius: var(--radius-xl);
+            font-size: 15px; cursor: pointer;
+            font-weight: 700;
+            transition: var(--transition);
+            box-shadow: 0 3px 10px rgba(7,193,96,0.3);
+            letter-spacing: 0.5px;
+        }
+        .auth-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(7,193,96,0.4); }
+        .auth-btn:active { transform: translateY(0); }
+
+        .error-msg { color: var(--danger); font-size: 13px; margin-top: 8px; font-weight: 500; }
+
+        /* ===== Buttons (generic) ===== */
+        .new-group-btn, .new-post-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white; border: none;
+            padding: 10px 16px;
+            border-radius: var(--radius-lg);
+            cursor: pointer; font-weight: 600;
+            margin: 10px 14px;
+            width: calc(100% - 28px);
+            font-size: 14px;
+            transition: var(--transition);
+            box-shadow: 0 2px 8px rgba(7,193,96,0.25);
+        }
+        .new-group-btn:hover, .new-post-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(7,193,96,0.35); }
+
+        /* ===== Post Card ===== */
+        .post-card {
+            background: var(--bg-white);
+            margin: 10px 14px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 16px 18px;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
+        }
+        .post-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--primary); }
+        .post-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+        .post-preview { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5; }
+        .post-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-tertiary); align-items: center; }
+        .post-stats i { margin-right: 4px; }
+        .post-stats { display: flex; gap: 12px; }
+        .post-author { display: flex; align-items: center; gap: 4px; }
+
+        /* ===== Like/Fav Buttons ===== */
+        .like-fav-buttons { display: flex; gap: 16px; margin: 14px 0; }
+        .like-fav-buttons button {
+            background: var(--bg-sidebar); border: 1.5px solid var(--border-color);
+            cursor: pointer; font-size: 14px;
+            color: var(--text-secondary);
+            padding: 7px 16px;
+            border-radius: var(--radius-xl);
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        .like-fav-buttons button.active { color: var(--danger); border-color: var(--danger); background: #fff0f0; }
+        .like-fav-buttons button:hover { transform: scale(1.04); }
+
+        /* ===== Comment ===== */
+        .comment-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        .comment-author { font-weight: 600; margin-bottom: 5px; font-size: 14px; }
+        .comment-time { font-size: 11px; color: var(--text-tertiary); margin-left: 8px; }
+
+        /* ===== Member List ===== */
+        .member-list { max-height: 300px; overflow-y: auto; margin: 10px 0; }
+        .member-item {
+            display: flex; justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f5f5f5;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+        }
+        .member-item:hover { background: var(--primary-light); }
+        .member-nickname { font-size: 12px; color: var(--text-tertiary); }
+
+        /* ===== Inline Input ===== */
+        .inline-input {
+            width: 100%; padding: 9px 14px;
+            margin-top: 8px;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            font-size: 14px;
+            outline: none;
+            transition: var(--transition);
+            color: var(--text-primary);
+        }
+        .inline-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(7,193,96,0.12); }
+
+        /* ===== Canvas (Drawing) ===== */
+        canvas {
+            border: 1.5px solid var(--border-color);
+            background: white;
+            margin: 10px 0;
+            width: 100%; height: auto;
+            border-radius: var(--radius-sm);
+            cursor: crosshair;
+        }
+
+        /* ===== Misc ===== */
+        hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 14px 0;
+        }
+
+        /* ===== Missing Classes ===== */
+        .user-select-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+            font-size: 14px;
+        }
+        .user-select-item:hover { background: var(--primary-light); color: var(--primary); }
+        .post-detail-content {
+            line-height: 1.8;
+            font-size: 15px;
+            padding: 12px 0;
+            word-wrap: break-word;
+        }
+        .post-detail-content p { margin: 8px 0; }
+        .post-detail-content img { max-width: 100%; border-radius: var(--radius-sm); }
+        .post-detail-content pre { background: #f5f5f5; padding: 12px; border-radius: var(--radius-sm); overflow-x: auto; }
+        .post-detail-content code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+        .post-detail-content h1, .post-detail-content h2, .post-detail-content h3 { margin: 16px 0 8px; }
+
+        .draw-toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+        .draw-toolbar .dt-btn { background:#eee; padding:6px 12px; border-radius:var(--radius-sm); border:none; cursor:pointer; font-size:13px; transition:var(--transition); }
+        .draw-toolbar .dt-btn:hover { background: var(--primary-light); }
+        .draw-toolbar .dt-btn.active-tool { background: #c8e6d9; box-shadow: inset 0 0 0 2px var(--primary); }
+        .draw-actions { margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
+        .draw-save-btn { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:white; border:none; padding:7px 18px; border-radius:var(--radius-xl); cursor:pointer; font-weight:600; transition:var(--transition); font-size:13px; }
+        .draw-save-btn:hover { box-shadow:0 2px 8px rgba(7,193,96,0.4); transform:translateY(-1px); }
+        .draw-cancel-btn { background:#f0f0f0; color:var(--text-secondary); border:1.5px solid var(--border-color); padding:7px 18px; border-radius:var(--radius-xl); cursor:pointer; font-weight:500; transition:var(--transition); font-size:13px; }
+        .draw-cancel-btn:hover { background:#e8e8e8; }
+
+        .modal-body { padding: 20px 28px; }
+        .modal-body h3 { font-size:18px; font-weight:700; margin-bottom:14px; color:var(--text-primary); }
+        .modal-field { margin-bottom:14px; }
+        .modal-field label { display:block; font-size:13px; color:var(--text-secondary); margin-bottom:4px; font-weight:500; }
+        .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+        .modal-btn-cancel { background:#f0f0f0; color:var(--text-secondary); border:1.5px solid var(--border-color); padding:7px 16px; border-radius:var(--radius-xl); cursor:pointer; font-weight:500; transition:var(--transition); }
+        .modal-btn-cancel:hover { background:#e8e8e8; }
+        .modal-btn-confirm { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:white; border:none; padding:7px 16px; border-radius:var(--radius-xl); cursor:pointer; font-weight:600; transition:var(--transition); box-shadow:0 2px 6px rgba(7,193,96,0.25); }
+        .modal-btn-confirm:hover { box-shadow:0 4px 12px rgba(7,193,96,0.35); transform:translateY(-1px); }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; height: 100vh; position: absolute; z-index: 10; }
+            .chat-area { display: none; }
+            .chat-area.active { display: flex; position: absolute; inset: 0; z-index: 20; }
+            .auth-card { padding: 30px 24px; }
+            .modal-content { padding: 18px 16px; }
+            .message-bubble { max-width: 85%; }
+        }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+    // ------------------------------ 配置 ------------------------------
+    const API_BASE = 'http://localhost:3000/api';  // 修改为你的后端地址
+    const SOCKET_URL = 'http://localhost:3000';
+    
+    // 全局变量
+    let currentUser = null;
+    let currentChatId = null;
+    let currentAlignment = 'left';
+    let pendingFiles = [];
+    let fileStorage = new Map();
+    let socket = null;
+    let allChats = [];
+    let allUsers = [];
+    let activeTab = 'chats'; // 'chats', 'contacts', 'posts'
+    
+    // ------------------------------ 辅助函数 ------------------------------
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    async function apiFetch(url, options = {}) {
+        const response = await fetch(API_BASE + url, {
+            headers: { 'Content-Type': 'application/json' },
+            ...options,
+            body: options.body ? JSON.stringify(options.body) : undefined
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: '请求失败' }));
+            throw new Error(error.message || '请求失败');
+        }
+        return response.json();
+    }
+    
+    // 富文本渲染
+    function parseBBCode(text) {
+        let html = text.replace(/\[b\](.*?)\[\/b\]/g, '<strong>$1</strong>');
+        html = html.replace(/\[i\](.*?)\[\/i\]/g, '<em>$1</em>');
+        html = html.replace(/\[u\](.*?)\[\/u\]/g, '<u>$1</u>');
+        html = html.replace(/\[code\](.*?)\[\/code\]/gs, '<pre><code>$1</code></pre>');
+        return html;
+    }
+    function renderRichText(rawText) {
+        if (!rawText) return '';
+        let withBBCode = parseBBCode(rawText);
+        let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false });
+        return withMarkdown;
+    }
+    function renderLatexInContainer(container) {
+        if (window.renderMathInElement) {
+            renderMathInElement(container, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false
+            });
+        }
+    }
+    
+    // 图片预览
+    function showImagePreview(src) {
+        const existing = document.querySelector('.image-preview-modal');
+        if (existing) existing.remove();
+        const modal = document.createElement('div');
+        modal.className = 'image-preview-modal';
+        modal.innerHTML = `<button class="close-btn">&times;</button><img src="${src}" alt="预览图片">`;
+        document.body.appendChild(modal);
+        const closeBtn = modal.querySelector('.close-btn');
+        const closeModal = () => modal.remove();
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        closeBtn.addEventListener('click', closeModal);
+        const escHandler = (e) => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escHandler); } };
+        document.addEventListener('keydown', escHandler);
+    }
+    
+    // 文件相关
+    function downloadFile(fileId, fileName) {
+        const blob = fileStorage.get(fileId);
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } else {
+            alert('文件不存在，可能由其他设备上传，无法下载');
+        }
+    }
+    
+    function handleFileUpload(fileInput) {
+        const files = Array.from(fileInput.files);
+        const maxSizeBytes = 500 * 1024 * 1024 * 1024;
+        for (let file of files) {
+            if (file.size > maxSizeBytes) {
+                alert(`文件 ${file.name} 超过 500GB 限制`);
+                continue;
+            }
+            let fileObj = {
+                name: file.name,
+                size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+                type: 'file',
+                raw: file
+            };
+            if (file.type.startsWith('image/')) {
+                fileObj.type = 'image';
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    fileObj.preview = e.target.result;
+                    pendingFiles = pendingFiles.filter(f => f.name !== fileObj.name);
+                    pendingFiles.push(fileObj);
+                    renderPendingFiles();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                pendingFiles = pendingFiles.filter(f => f.name !== fileObj.name);
+                pendingFiles.push(fileObj);
+            }
+        }
+        renderPendingFiles();
+        fileInput.value = '';
+    }
+    
+    function removePendingFile(index) {
+        pendingFiles.splice(index, 1);
+        renderPendingFiles();
+    }
+    
+    function renderPendingFiles() {
+        const container = document.getElementById('pendingFilesContainer');
+        if (!container) return;
+        if (pendingFiles.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        container.innerHTML = pendingFiles.map((f, idx) => `
+            <span class="file-tag">
+                ${f.type === 'image' ? '🖼️' : f.type === 'drawing' ? '🎨' : '📄'} ${f.name} (${f.size})
+                <button onclick="window.removePendingFile(${idx})" style="margin-left:6px;background:none;border:none;cursor:pointer;">❌</button>
+            </span>
+        `).join('');
+    }
+    
+    // 绘图工具
+    let drawingModalElement = null, drawingCanvas = null, drawingCtx = null;
+    let currentTool = 'pen', drawingColor = '#07c160';
+    let isDrawing = false, lastX = 0, lastY = 0;
+    
+    function drawStar(ctx, cx, cy, spikes, outerR, innerR, color) {
+        let rot = Math.PI/2*3, step = Math.PI/spikes;
+        ctx.beginPath();
+        for (let i = 0; i < spikes; i++) {
+            let x1 = cx + Math.cos(rot) * outerR;
+            let y1 = cy + Math.sin(rot) * outerR;
+            ctx.lineTo(x1, y1);
+            rot += step;
+            let x2 = cx + Math.cos(rot) * innerR;
+            let y2 = cy + Math.sin(rot) * innerR;
+            ctx.lineTo(x2, y2);
+            rot += step;
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+    function drawShapeAt(ctx, tool, x, y, color) {
+        ctx.fillStyle = color;
+        switch (tool) {
+            case 'rect': ctx.fillRect(x-40, y-30, 80, 60); break;
+            case 'square': ctx.fillRect(x-35, y-35, 70, 70); break;
+            case 'circle': ctx.beginPath(); ctx.arc(x, y, 40, 0, 2*Math.PI); ctx.fill(); break;
+            case 'triangle':
+                ctx.beginPath();
+                ctx.moveTo(x, y-40);
+                ctx.lineTo(x-35, y+30);
+                ctx.lineTo(x+35, y+30);
+                ctx.closePath();
+                ctx.fill();
+                break;
+            case 'star': drawStar(ctx, x, y, 5, 45, 20, color); break;
+        }
+    }
+    function drawLine(ctx, fx, fy, tx, ty, color) {
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(tx, ty);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+    function startDrawing(e) {
+        if (currentTool !== 'pen') return;
+        isDrawing = true;
+        const rect = drawingCanvas.getBoundingClientRect();
+        const sx = drawingCanvas.width / rect.width, sy = drawingCanvas.height / rect.height;
+        let x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+        x = Math.min(Math.max(0, x), drawingCanvas.width);
+        y = Math.min(Math.max(0, y), drawingCanvas.height);
+        lastX = x; lastY = y;
+        drawingCtx.fillStyle = drawingColor;
+        drawingCtx.fillRect(x-1, y-1, 2, 2);
+    }
+    function draw(e) {
+        if (!isDrawing || currentTool !== 'pen') return;
+        const rect = drawingCanvas.getBoundingClientRect();
+        const sx = drawingCanvas.width / rect.width, sy = drawingCanvas.height / rect.height;
+        let x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+        x = Math.min(Math.max(0, x), drawingCanvas.width);
+        y = Math.min(Math.max(0, y), drawingCanvas.height);
+        drawLine(drawingCtx, lastX, lastY, x, y, drawingColor);
+        lastX = x; lastY = y;
+    }
+    function stopDrawing() { isDrawing = false; }
+    function clearCanvas() {
+        drawingCtx.fillStyle = '#fff';
+        drawingCtx.fillRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    }
+    function placeShape(e) {
+        if (currentTool === 'pen') return;
+        const rect = drawingCanvas.getBoundingClientRect();
+        const sx = drawingCanvas.width / rect.width, sy = drawingCanvas.height / rect.height;
+        let x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+        x = Math.min(Math.max(0, x), drawingCanvas.width);
+        y = Math.min(Math.max(0, y), drawingCanvas.height);
+        drawShapeAt(drawingCtx, currentTool, x, y, drawingColor);
+    }
+    function openDrawingModal() {
+        if (drawingModalElement) return;
+        drawingModalElement = document.createElement('div');
+        drawingModalElement.className = 'modal';
+        drawingModalElement.innerHTML = `
+            <div class="modal-content" style="max-width:600px;">
+                <h4>✏️ 绘图工具</h4>
+                <div class="draw-toolbar">
+                    <button id="toolPen" class="dt-btn active-tool">✍️ 画笔</button>
+                    <button id="toolRect" class="dt-btn">📦 长方形</button>
+                    <button id="toolSquare" class="dt-btn">⬛ 正方形</button>
+                    <button id="toolCircle" class="dt-btn">⚪ 圆形</button>
+                    <button id="toolTriangle" class="dt-btn">🔺 三角形</button>
+                    <button id="toolStar" class="dt-btn">⭐ 五角星</button>
+                    <input type="color" id="drawColorPicker" value="#07c160">
+                    <button id="clearCanvasBtn" class="dt-btn">🗑️ 清空</button>
+                </div>
+                <canvas id="drawCanvas" width="500" height="400"></canvas>
+                <div class="draw-actions">
+                    <button id="cancelDrawBtn" class="draw-cancel-btn">取消</button>
+                    <button id="saveDrawBtn" class="draw-save-btn">💾 插入绘图</button>
+                </div>
+                <div style="font-size:12px; color:#666; margin-top:8px;">💡 提示：画笔模式自由绘制；其他模式点击画布放置形状。</div>
+            </div>
+        `;
+        document.body.appendChild(drawingModalElement);
+        drawingCanvas = document.getElementById('drawCanvas');
+        drawingCanvas.width = 500; drawingCanvas.height = 400;
+        drawingCtx = drawingCanvas.getContext('2d');
+        clearCanvas();
+        const canvasEl = drawingCanvas;
+        canvasEl.addEventListener('mousedown', startDrawing);
+        canvasEl.addEventListener('mousemove', draw);
+        canvasEl.addEventListener('mouseup', stopDrawing);
+        canvasEl.addEventListener('mouseleave', stopDrawing);
+        canvasEl.addEventListener('click', placeShape);
+        document.getElementById('toolPen')?.addEventListener('click', () => { currentTool = 'pen'; highlightTool('pen'); });
+        document.getElementById('toolRect')?.addEventListener('click', () => { currentTool = 'rect'; highlightTool('rect'); });
+        document.getElementById('toolSquare')?.addEventListener('click', () => { currentTool = 'square'; highlightTool('square'); });
+        document.getElementById('toolCircle')?.addEventListener('click', () => { currentTool = 'circle'; highlightTool('circle'); });
+        document.getElementById('toolTriangle')?.addEventListener('click', () => { currentTool = 'triangle'; highlightTool('triangle'); });
+        document.getElementById('toolStar')?.addEventListener('click', () => { currentTool = 'star'; highlightTool('star'); });
+        document.getElementById('drawColorPicker')?.addEventListener('change', (e) => { drawingColor = e.target.value; });
+        document.getElementById('clearCanvasBtn')?.addEventListener('click', clearCanvas);
+        document.getElementById('cancelDrawBtn')?.addEventListener('click', closeDrawingModal);
+        document.getElementById('saveDrawBtn')?.addEventListener('click', () => {
+            const dataURL = drawingCanvas.toDataURL('image/png');
+            pendingFiles.push({
+                name: `drawing_${Date.now()}.png`,
+                size: '~50 KB',
+                type: 'drawing',
+                previewData: dataURL
+            });
+            closeDrawingModal();
+            renderPendingFiles();
+        });
+        drawingModalElement.addEventListener('click', (e) => { if (e.target === drawingModalElement) closeDrawingModal(); });
+        function highlightTool(tool) {
+            const btns = ['toolPen','toolRect','toolSquare','toolCircle','toolTriangle','toolStar'];
+            btns.forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.classList.remove('active-tool');
+                const expectedId = 'tool' + tool.charAt(0).toUpperCase() + tool.slice(1);
+                if (id === expectedId) btn.classList.add('active-tool');
+            });
+        }
+        highlightTool('pen');
+    }
+    function closeDrawingModal() {
+        if (drawingModalElement) { drawingModalElement.remove(); drawingModalElement = null; }
+        renderPendingFiles();
+    }
+    
+    // ------------------------------ 聊天核心业务 ------------------------------
+    async function sendMessage(text, attachments, alignment, chatId, sender) {
+        try {
+            return await apiFetch(`/messages/${chatId}`, {
+                method: 'POST',
+                body: { text, attachments, alignment, sender }
+            });
+        } catch (err) {
+            alert('发送失败：' + err.message);
+        }
+    }
+    
+    async function doSendMessage(inputEl) {
+        const text = inputEl.value.trim();
+        if (!text && pendingFiles.length === 0) return;
+        const attachments = [];
+        for (let f of pendingFiles) {
+            if (f.type === 'image') {
+                attachments.push({ type: 'image', name: f.name, url: f.preview, previewData: f.preview });
+            } else if (f.type === 'drawing') {
+                attachments.push({ type: 'drawing', name: f.name, previewData: f.previewData });
+            } else if (f.type === 'file') {
+                if (f.raw) {
+                    const fileId = Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+                    fileStorage.set(fileId, f.raw);
+                    attachments.push({ type: 'file', name: f.name, size: f.size, fileId });
+                } else {
+                    attachments.push({ type: 'file', name: f.name, size: f.size, isDemo: true });
+                }
+            }
+        }
+        await sendMessage(text, attachments, currentAlignment, currentChatId, currentUser);
+        inputEl.value = '';
+        pendingFiles = [];
+        renderPendingFiles();
+    }
+    
+    async function loadChats() {
+        const data = await apiFetch(`/chats/${currentUser}`);
+        allChats = data;
+        return allChats;
+    }
+    
+    async function loadMessages(chatId) {
+        return await apiFetch(`/messages/${chatId}`);
+    }
+    
+    async function renderMessageList() {
+        const listContainer = document.getElementById('messageList');
+        if (!listContainer || !currentChatId) return;
+        const messages = await loadMessages(currentChatId);
+        const members = await apiFetch(`/chats/${currentChatId}/members`);
+        const displayNameMap = {};
+        members.forEach(m => { displayNameMap[m.username] = m.displayName; });
+        listContainer.innerHTML = messages.map(msg => {
+            const richHtml = renderRichText(msg.text);
+            const displayName = displayNameMap[msg.sender] || msg.sender;
+            const attachmentsHtml = (msg.attachments || []).map(att => {
+                if (att.type === 'image' || (att.type === 'drawing' && att.previewData)) {
+                    const imgSrc = att.previewData || att.url;
+                    return `<img src="${imgSrc}" class="attachment-img-preview" alt="preview" data-src="${imgSrc}" style="max-width:80px;max-height:80px;border-radius:8px;cursor:pointer;">`;
+                } else if (att.type === 'file') {
+                    const fileId = att.fileId || '';
+                    return `<div class="attachment-item" data-file-id="${fileId}" data-file-name="${att.name}">
+                                <i class="fas fa-file"></i> ${att.name} <span class="badge">${att.size || '未知'}</span>
+                            </div>`;
+                }
+                return '';
+            }).join('');
+            return `
+                <div class="message-wrapper align-${msg.alignment}">
+                    <div class="message-bubble">
+                        <div class="message-content">${richHtml}</div>
+                        ${attachmentsHtml ? `<div class="attachments-area">${attachmentsHtml}</div>` : ''}
+                        <div class="message-meta">
+                            <span>${escapeHtml(displayName)}</span>
+                            <span>${msg.timestamp}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        renderLatexInContainer(listContainer);
+        listContainer.scrollTop = listContainer.scrollHeight;
+        listContainer.querySelectorAll('.attachment-img-preview').forEach(img => {
+            img.removeEventListener('click', handleImageClick);
+            img.addEventListener('click', handleImageClick);
+        });
+        listContainer.querySelectorAll('.attachment-item').forEach(el => {
+            el.removeEventListener('click', handleFileDownload);
+            el.addEventListener('click', handleFileDownload);
+        });
+    }
+    
+    function handleImageClick(e) {
+        e.stopPropagation();
+        const src = e.currentTarget.getAttribute('data-src') || e.currentTarget.src;
+        if (src) showImagePreview(src);
+    }
+    function handleFileDownload(e) {
+        const target = e.currentTarget;
+        const fileId = target.getAttribute('data-file-id');
+        const fileName = target.getAttribute('data-file-name');
+        if (fileId) downloadFile(fileId, fileName);
+        else alert('无法下载此文件');
+    }
+    
+    async function renderChatList() {
+        const container = document.getElementById('chatList');
+        if (!container) return;
+        await loadChats();
+        const groups = allChats.filter(c => c.type === 'group');
+        const privates = allChats.filter(c => c.type === 'private');
+        let html = '';
+        if (groups.length) {
+            html += `<div style="padding:8px 12px; font-size:14px; color:#666;">群聊</div>`;
+            groups.forEach(chat => {
+                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="group">
+                            <div class="conv-avatar" style="background:#07c160;">👥</div>
+                            <div class="conv-info">
+                                <div class="conv-name">${escapeHtml(chat.name)}</div>
+                                <div class="conv-preview">${chat.members.length}人</div>
+                            </div>
+                        </div>`;
+            });
+        }
+        if (privates.length) {
+            html += `<div style="padding:8px 12px; font-size:14px; color:#666;">私聊</div>`;
+            privates.forEach(chat => {
+                const other = chat.members.find(m => m !== currentUser);
+                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="private">
+                            <div class="conv-avatar" style="background:#576b95;">👤</div>
+                            <div class="conv-info">
+                                <div class="conv-name">${escapeHtml(other)}</div>
+                                <div class="conv-preview">私聊</div>
+                            </div>
+                        </div>`;
+            });
+        }
+        container.innerHTML = html;
+        document.querySelectorAll('#chatList .conv-item').forEach(el => {
+            el.addEventListener('click', async () => {
+                const id = el.getAttribute('data-id');
+                if (id) {
+                    currentChatId = id;
+                    await renderChatList();
+                    await renderMessageList();
+                    const chat = allChats.find(c => c.id === id);
+                    const titleSpan = document.getElementById('chatTitle');
+                    if (titleSpan && chat) {
+                        if (chat.type === 'group') titleSpan.innerText = chat.name;
+                        else {
+                            const other = chat.members.find(m => m !== currentUser);
+                            titleSpan.innerText = `与 ${other} 的私聊`;
+                        }
+                    }
+                    document.getElementById('groupSettingsBtn').style.display = 'inline-block';
+                }
+            });
+        });
+    }
+    
+    async function renderContactList(searchKeyword = '') {
+        const container = document.getElementById('contactList');
+        if (!container) return;
+        allUsers = await apiFetch('/users');
+        let filteredUsers = allUsers.filter(u => u.username !== currentUser);
+        if (searchKeyword) {
+            const kw = searchKeyword.toLowerCase();
+            filteredUsers = filteredUsers.filter(u => u.username.toLowerCase().includes(kw) || u.nickname.toLowerCase().includes(kw));
+        }
+        filteredUsers.sort((a,b) => a.nickname.localeCompare(b.nickname));
+        let html = '';
+        filteredUsers.forEach(user => {
+            html += `<div class="contact-item" data-username="${user.username}" data-nickname="${user.nickname}">
+                        <div class="contact-avatar" style="background:#9b59b6;">${user.nickname.charAt(0).toUpperCase()}</div>
+                        <div class="contact-info">
+                            <div class="contact-name">${escapeHtml(user.nickname)}</div>
+                            <div class="contact-username">@${escapeHtml(user.username)}</div>
+                        </div>
+                    </div>`;
+        });
+        container.innerHTML = html;
+        document.querySelectorAll('#contactList .contact-item').forEach(el => {
+            el.addEventListener('click', async () => {
+                const username = el.getAttribute('data-username');
+                const nickname = el.getAttribute('data-nickname');
+                const result = await apiFetch('/private', { method: 'POST', body: { userA: currentUser, userB: username } });
+                currentChatId = result.id;
+                activeTab = 'chats';
+                document.querySelector('.tab.chats-tab').classList.add('active');
+                document.querySelector('.tab.contacts-tab').classList.remove('active');
+                document.getElementById('chatList').classList.add('active');
+                document.getElementById('contactList').classList.remove('active');
+                await renderChatList();
+                await renderMessageList();
+                const titleSpan = document.getElementById('chatTitle');
+                if (titleSpan) titleSpan.innerText = `与 ${nickname} 的私聊`;
+                document.getElementById('groupSettingsBtn').style.display = 'inline-block';
+            });
+        });
+    }
+    
+    async function createNewGroup() {
+        const name = prompt('请输入群名称');
+        if (name && name.trim()) {
+            const newGroup = await apiFetch('/groups', { method: 'POST', body: { name: name.trim(), creator: currentUser } });
+            currentChatId = newGroup.id;
+            await renderChatList();
+            await renderMessageList();
+            const titleSpan = document.getElementById('chatTitle');
+            if (titleSpan) titleSpan.innerText = newGroup.name;
+        }
+    }
+    
+    async function showGroupSettings() {
+        const chat = allChats.find(c => c.id === currentChatId);
+        if (!chat) return;
+        const members = await apiFetch(`/chats/${currentChatId}/members`);
+        const isCreator = chat.type === 'group' && chat.creator === currentUser;
+        const currentNickname = members.find(m => m.username === currentUser)?.groupNickname || '';
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h3>会话设置</h3>
+                    ${chat.type === 'group' && isCreator ? `<div class="modal-field"><label>群名称：</label><input id="groupNameInput" value="${escapeHtml(chat.name)}" class="inline-input"><button id="saveGroupNameBtn" class="modal-btn-confirm" style="margin-top:8px;">修改群名</button></div><hr>` : ''}
+                    ${chat.type === 'group' ? `<div class="modal-field"><button id="addMemberBtn" class="modal-btn-confirm" style="width:100%;">➕ 添加群成员</button></div><hr>` : ''}
+                    <div class="modal-field">
+                        <label>我的本会话昵称：</label>
+                        <input id="myNicknameInput" value="${escapeHtml(currentNickname)}" placeholder="留空则使用全局昵称" class="inline-input">
+                        <button id="saveNicknameBtn" class="modal-btn-confirm" style="margin-top:8px;">设置</button>
+                    </div>
+                    <hr>
+                    <h4 style="margin-bottom:8px;">成员 (${members.length})</h4>
+                    <div class="member-list">
+                        ${members.map(m => `<div class="member-item"><span>${escapeHtml(m.displayName)}</span><span class="member-nickname">@${escapeHtml(m.username)}</span></div>`).join('')}
+                    </div>
+                    <div class="modal-actions"><button id="closeSettingsBtn" class="modal-btn-cancel">关闭</button></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        if (chat.type === 'group' && isCreator) {
+            document.getElementById('saveGroupNameBtn')?.addEventListener('click', async () => {
+                const newName = document.getElementById('groupNameInput').value.trim();
+                if (newName) {
+                    await apiFetch(`/groups/${currentChatId}`, { method: 'PUT', body: { name: newName, operator: currentUser } });
+                    alert('群名修改成功');
+                    await renderChatList();
+                    const titleSpan = document.getElementById('chatTitle');
+                    if (titleSpan) titleSpan.innerText = newName;
+                    modal.remove();
+                } else alert('群名不能为空');
+            });
+        }
+        if (chat.type === 'group') {
+            document.getElementById('addMemberBtn')?.addEventListener('click', async () => {
+                modal.remove();
+                await showAddMemberModal(chat.id);
+            });
+        }
+        document.getElementById('saveNicknameBtn')?.addEventListener('click', async () => {
+            const newNick = document.getElementById('myNicknameInput').value.trim();
+            await apiFetch(`/chats/${currentChatId}/nickname`, { method: 'POST', body: { username: currentUser, nickname: newNick } });
+            alert('昵称已更新');
+            await renderMessageList();
+            modal.remove();
+        });
+        document.getElementById('closeSettingsBtn')?.addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    }
+    
+    async function showAddMemberModal(groupId) {
+        const members = await apiFetch(`/chats/${groupId}/members`);
+        const existingUsernames = members.map(m => m.username);
+        const allUsersList = await apiFetch('/users');
+        const availableUsers = allUsersList.filter(u => !existingUsernames.includes(u.username) && u.username !== currentUser);
+        if (availableUsers.length === 0) {
+            alert('没有可添加的用户');
+            return;
+        }
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:500px;">
+                <div class="modal-body">
+                    <h3>添加群成员</h3>
+                    <div style="max-height:300px; overflow-y:auto;">
+                        ${availableUsers.map(u => `<div class="user-select-item" data-username="${u.username}" data-nickname="${u.nickname}">
+                            ${escapeHtml(u.nickname)} (@${escapeHtml(u.username)})
+                        </div>`).join('')}
+                    </div>
+                    <div class="modal-actions"><button id="closeAddMemberBtn" class="modal-btn-cancel">取消</button></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.querySelectorAll('.user-select-item').forEach(el => {
+            el.addEventListener('click', async () => {
+                const username = el.getAttribute('data-username');
+                try {
+                    await apiFetch(`/groups/${groupId}/members`, {
+                        method: 'POST',
+                        body: { username, operator: currentUser }
+                    });
+                    alert(`已添加 ${username}`);
+                    modal.remove();
+                    await renderChatList();
+                    if (currentChatId === groupId) {
+                        const titleSpan = document.getElementById('chatTitle');
+                        const chat = allChats.find(c => c.id === groupId);
+                        if (titleSpan && chat) titleSpan.innerText = chat.name;
+                    }
+                } catch (err) {
+                    alert('添加失败：' + err.message);
+                }
+            });
+        });
+        document.getElementById('closeAddMemberBtn')?.addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    }
+    
+    // ------------------------------ 帖子相关 ------------------------------
+    async function loadPosts() {
+        return await apiFetch('/posts');
+    }
+    
+    async function createPost(title, content) {
+        return await apiFetch('/posts', { method: 'POST', body: { title, content, author: currentUser } });
+    }
+    
+    async function getPostDetail(postId) {
+        return await apiFetch(`/posts/${postId}`);
+    }
+    
+    async function likePost(postId) {
+        return await apiFetch(`/posts/${postId}/like`, { method: 'POST', body: { username: currentUser } });
+    }
+    
+    async function favoritePost(postId) {
+        return await apiFetch(`/posts/${postId}/favorite`, { method: 'POST', body: { username: currentUser } });
+    }
+    
+    async function addView(postId) {
+        await apiFetch(`/posts/${postId}/view`, { method: 'POST' });
+    }
+    
+    async function addComment(postId, content) {
+        return await apiFetch(`/posts/${postId}/comments`, { method: 'POST', body: { content, author: currentUser } });
+    }
+    
+    async function renderPostList() {
+        const container = document.getElementById('postList');
+        if (!container) return;
+        const posts = await loadPosts();
+        container.innerHTML = posts.map(post => `
+            <div class="post-card" data-id="${post.id}">
+                <div class="post-title">${escapeHtml(post.title)}</div>
+                <div class="post-preview">${escapeHtml(post.content.substring(0, 100))}...</div>
+                <div class="post-meta">
+                    <span class="post-author"><i class="fas fa-user"></i> ${escapeHtml(post.authorNickname)}</span>
+                    <span class="post-stats">
+                        <i class="fas fa-eye"></i> ${post.views || 0}
+                        <i class="fas fa-heart"></i> ${post.likeCount}
+                        <i class="fas fa-star"></i> ${post.favoriteCount}
+                        <i class="fas fa-comment"></i> ${post.commentCount}
+                    </span>
+                </div>
+                <div style="text-align: right; margin-top: 8px;">
+                    <button class="auth-btn" style="padding: 4px 12px;" data-id="${post.id}">查看详情</button>
+                </div>
+            </div>
+        `).join('');
+        document.querySelectorAll('#postList .post-card .auth-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const postId = btn.getAttribute('data-id');
+                if (postId) await showPostDetail(postId);
+            });
+        });
+        document.querySelectorAll('#postList .post-card').forEach(card => {
+            card.addEventListener('click', async (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                const postId = card.getAttribute('data-id');
+                if (postId) await showPostDetail(postId);
+            });
+        });
+    }
+    
+    async function showPostDetail(postId) {
+        await addView(postId);
+        const post = await getPostDetail(postId);
+        const liked = post.likes?.includes(currentUser);
+        const favorited = post.favorites?.includes(currentUser);
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h2 style="margin-bottom:10px; font-size:22px; font-weight:700;">${escapeHtml(post.title)}</h2>
+                    <div class="post-meta" style="margin-bottom:12px;">
+                        <span><i class="fas fa-user"></i> ${escapeHtml(post.authorNickname)}</span>
+                        <span><i class="fas fa-clock"></i> ${new Date(post.createdAt).toLocaleString()}</span>
+                        <span><i class="fas fa-eye"></i> ${post.views}</span>
+                    </div>
+                    <div class="like-fav-buttons">
+                        <button id="likeBtn" class="${liked ? 'active' : ''}"><i class="fas fa-heart"></i> 点赞 ${post.likeCount}</button>
+                        <button id="favBtn" class="${favorited ? 'active' : ''}"><i class="fas fa-star"></i> 收藏 ${post.favoriteCount}</button>
+                    </div>
+                    <div class="post-detail-content">${renderRichText(post.content)}</div>
+                    <hr>
+                    <h4 style="margin-bottom:8px;">评论 (${post.comments.length})</h4>
+                    <div id="commentsContainer" style="max-height:300px; overflow-y:auto; margin:8px 0;">
+                        ${post.comments.map(c => `
+                            <div class="comment-item">
+                                <div class="comment-author">
+                                    ${escapeHtml(c.authorNickname)}
+                                    <span class="comment-time">${new Date(c.createdAt).toLocaleString()}</span>
+                                </div>
+                                <div>${renderRichText(c.content)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <textarea id="commentInput" class="text-input" rows="3" placeholder="发表评论... 支持 Markdown/LaTeX/BBCode"></textarea>
+                    <div class="modal-actions">
+                        <button id="submitCommentBtn" class="modal-btn-confirm">发表评论</button>
+                        <button id="closePostBtn" class="modal-btn-cancel">关闭</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const likeBtn = modal.querySelector('#likeBtn');
+        const favBtn = modal.querySelector('#favBtn');
+        likeBtn.addEventListener('click', async () => {
+            const result = await likePost(postId);
+            likeBtn.innerHTML = `<i class="fas fa-heart"></i> 点赞 ${result.likeCount}`;
+            if (result.liked) likeBtn.classList.add('active');
+            else likeBtn.classList.remove('active');
+        });
+        favBtn.addEventListener('click', async () => {
+            const result = await favoritePost(postId);
+            favBtn.innerHTML = `<i class="fas fa-star"></i> 收藏 ${result.favoriteCount}`;
+            if (result.favorited) favBtn.classList.add('active');
+            else favBtn.classList.remove('active');
+        });
+        const commentInput = modal.querySelector('#commentInput');
+        const submitBtn = modal.querySelector('#submitCommentBtn');
+        submitBtn.addEventListener('click', async () => {
+            const content = commentInput.value.trim();
+            if (!content) return alert('评论内容不能为空');
+            await addComment(postId, content);
+            commentInput.value = '';
+            const updatedPost = await getPostDetail(postId);
+            const commentsContainer = modal.querySelector('#commentsContainer');
+            commentsContainer.innerHTML = updatedPost.comments.map(c => `
+                <div class="comment-item">
+                    <div class="comment-author">
+                        ${escapeHtml(c.authorNickname)}
+                        <span class="comment-time">${new Date(c.createdAt).toLocaleString()}</span>
+                    </div>
+                    <div>${renderRichText(c.content)}</div>
+                </div>
+            `).join('');
+            const header = modal.querySelector('h4');
+            if (header) header.innerText = `评论 (${updatedPost.comments.length})`;
+        });
+        modal.querySelector('#closePostBtn').addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        renderLatexInContainer(modal);
+    }
+    
+    async function showCreatePostModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h3>发布新帖</h3>
+                    <input id="postTitle" class="text-input" placeholder="标题" style="margin-bottom:12px;">
+                    <textarea id="postContent" class="text-input" rows="8" placeholder="内容... 支持 Markdown、LaTeX、BBCode、绘图等"></textarea>
+                    <div class="modal-actions">
+                        <button id="submitPostBtn" class="modal-btn-confirm">发布</button>
+                        <button id="cancelPostBtn" class="modal-btn-cancel">取消</button>
+                    </div>
+                    <p style="font-size:12px; color:#888; margin-top:8px;">
+                        💡 提示：你可以使用绘图工具生成图片后，将图片链接或base64嵌入内容。
+                    </p>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const titleInput = modal.querySelector('#postTitle');
+        const contentInput = modal.querySelector('#postContent');
+        const submitBtn = modal.querySelector('#submitPostBtn');
+        submitBtn.addEventListener('click', async () => {
+            const title = titleInput.value.trim();
+            const content = contentInput.value.trim();
+            if (!title || !content) return alert('标题和内容不能为空');
+            await createPost(title, content);
+            modal.remove();
+            await renderPostList();
+            alert('发布成功');
+        });
+        modal.querySelector('#cancelPostBtn').addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    }
+    
+    // ------------------------------ 登录/注册 ------------------------------
+    async function login(username, password) {
+        const data = await apiFetch('/login', { method: 'POST', body: { username, password } });
+        if (data.success) {
+            localStorage.setItem('chat_username', username);
+            currentUser = username;
+            allUsers = await apiFetch('/users');
+            socket = io(SOCKET_URL);
+            socket.emit('user_login', username);
+            socket.on('new_message', ({ chatId, message }) => {
+                if (chatId === currentChatId) renderMessageList();
+                else renderChatList();
+            });
+            socket.on('group_updated', ({ groupId, newName }) => {
+                if (groupId === currentChatId) {
+                    const titleSpan = document.getElementById('chatTitle');
+                    if (titleSpan) titleSpan.innerText = newName;
+                }
+                renderChatList();
+            });
+            socket.on('group_member_added', () => { renderChatList(); });
+            await loadChats();
+            if (allChats.length > 0) currentChatId = allChats[0].id;
+            renderMainApp({ username, nickname: data.nickname });
+        } else {
+            throw new Error(data.message);
+        }
+    }
+    
+    function logout() {
+        if (socket) socket.disconnect();
+        localStorage.removeItem('chat_username');
+        location.reload();
+    }
+    
+    async function register(username, nickname, password, confirmPwd) {
+        if (password !== confirmPwd) throw new Error('两次密码输入不一致');
+        return apiFetch('/register', { method: 'POST', body: { username, nickname, password } });
+    }
+    
+    function renderAuth() {
+        const root = document.getElementById('root');
+        root.innerHTML = `
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-tabs">
+                        <div class="auth-tab active" data-tab="login">登录</div>
+                        <div class="auth-tab" data-tab="register">注册</div>
+                    </div>
+                    <div id="authForm"></div>
+                    <div id="authError" class="error-msg"></div>
+                </div>
+            </div>
+        `;
+        const loginTab = root.querySelector('[data-tab="login"]');
+        const registerTab = root.querySelector('[data-tab="register"]');
+        const formContainer = document.getElementById('authForm');
+        const errorDiv = document.getElementById('authError');
+        function showLogin() {
+            formContainer.innerHTML = `
+                <div class="auth-form">
+                    <input type="text" id="loginUsername" class="auth-input" placeholder="用户名">
+                    <input type="password" id="loginPassword" class="auth-input" placeholder="密码">
+                    <button id="loginBtn" class="auth-btn">登录</button>
+                </div>
+            `;
+            document.getElementById('loginBtn')?.addEventListener('click', async () => {
+                const username = document.getElementById('loginUsername').value.trim();
+                const password = document.getElementById('loginPassword').value.trim();
+                try {
+                    await login(username, password);
+                } catch (err) {
+                    errorDiv.innerText = err.message;
+                }
+            });
+        }
+        function showRegister() {
+            formContainer.innerHTML = `
+                <div class="auth-form">
+                    <input type="text" id="regUsername" class="auth-input" placeholder="用户名">
+                    <input type="text" id="regNickname" class="auth-input" placeholder="昵称">
+                    <input type="password" id="regPassword" class="auth-input" placeholder="密码">
+                    <input type="password" id="regConfirmPwd" class="auth-input" placeholder="确认密码">
+                    <button id="registerBtn" class="auth-btn">注册</button>
+                </div>
+            `;
+            document.getElementById('registerBtn')?.addEventListener('click', async () => {
+                const username = document.getElementById('regUsername').value.trim();
+                const nickname = document.getElementById('regNickname').value.trim();
+                const password = document.getElementById('regPassword').value.trim();
+                const confirmPwd = document.getElementById('regConfirmPwd').value.trim();
+                try {
+                    await register(username, nickname, password, confirmPwd);
+                    errorDiv.innerText = '注册成功，请登录';
+                    loginTab.click();
+                } catch (err) {
+                    errorDiv.innerText = err.message;
+                }
+            });
+        }
+        loginTab.addEventListener('click', () => {
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            showLogin();
+            errorDiv.innerText = '';
+        });
+        registerTab.addEventListener('click', () => {
+            registerTab.classList.add('active');
+            loginTab.classList.remove('active');
+            showRegister();
+            errorDiv.innerText = '';
+        });
+        showLogin();
+    }
+    
+    // ------------------------------ 主界面渲染 ------------------------------
+    async function renderMainApp(userInfo) {
+        const root = document.getElementById('root');
+        root.innerHTML = `
+            <div class="app">
+                <div class="sidebar">
+                    <div class="sidebar-header">
+                        <h2><i class="fab fa-weixin" style="margin-right:8px;color:#07c160"></i> 微信Pro</h2>
+                        <button id="logoutBtn" class="logout-btn">退出</button>
+                    </div>
+                    <div class="tabs">
+                        <div class="tab chats-tab active">聊天</div>
+                        <div class="tab contacts-tab">通讯录</div>
+                        <div class="tab posts-tab">帖子</div>
+                    </div>
+                    <div class="search-box" id="contactSearchBox" style="display: none;">
+                        <input type="text" id="contactSearchInput" class="search-input" placeholder="搜索联系人...">
+                    </div>
+                    <div class="conv-list active" id="chatList"></div>
+                    <div class="contact-list" id="contactList"></div>
+                    <div class="post-list" id="postList"></div>
+                    <div style="padding:8px;">
+                        <button id="newGroupBtn" class="new-group-btn" style="display:block;">➕ 新建群聊</button>
+                        <button id="newPostBtn" class="new-post-btn" style="display:none;">📝 发布新帖</button>
+                    </div>
+                </div>
+                <div class="chat-area">
+                    <div class="chat-header">
+                        <span id="chatTitle">请选择一个会话</span>
+                        <span class="group-settings" id="groupSettingsBtn" style="display:none;">⚙️ 设置</span>
+                        <span class="user-info">${escapeHtml(userInfo.nickname)} (${escapeHtml(userInfo.username)})</span>
+                    </div>
+                    <div class="message-list" id="messageList"></div>
+                    <div class="input-area" id="chatInputArea">
+                        <div class="toolbar">
+                            <label class="tool-btn" title="上传文件"><i class="fas fa-paperclip"></i><input type="file" multiple id="fileInput" style="display:none"></label>
+                            <button class="tool-btn" id="drawToolBtn" title="绘图工具"><i class="fas fa-paint-brush"></i></button>
+                            <div class="align-selector">
+                                <button class="align-btn ${currentAlignment === 'left' ? 'active' : ''}" data-align="left"><i class="fas fa-align-left"></i> 左</button>
+                                <button class="align-btn ${currentAlignment === 'center' ? 'active' : ''}" data-align="center"><i class="fas fa-align-center"></i> 中</button>
+                                <button class="align-btn ${currentAlignment === 'right' ? 'active' : ''}" data-align="right"><i class="fas fa-align-right"></i> 右</button>
+                            </div>
+                            <span style="font-size:12px;color:#888;">LaTeX: $...$, Markdown, BBCode</span>
+                        </div>
+                        <div id="pendingFilesContainer" class="file-list"></div>
+                        <textarea id="messageInput" class="text-input" rows="2" placeholder="输入消息... 支持 $LaTeX$ 公式, **Markdown**, [b]BBCode[/b] ..."></textarea>
+                        <div style="display:flex; justify-content:flex-end;"><button id="sendBtn" class="send-btn">发送消息</button></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 标签页切换
+        const chatsTab = document.querySelector('.tab.chats-tab');
+        const contactsTab = document.querySelector('.tab.contacts-tab');
+        const postsTab = document.querySelector('.tab.posts-tab');
+        const chatListDiv = document.getElementById('chatList');
+        const contactListDiv = document.getElementById('contactList');
+        const postListDiv = document.getElementById('postList');
+        const contactSearchBox = document.getElementById('contactSearchBox');
+        const newGroupBtn = document.getElementById('newGroupBtn');
+        const newPostBtn = document.getElementById('newPostBtn');
+        const chatInputArea = document.getElementById('chatInputArea');
+        const groupSettingsBtn = document.getElementById('groupSettingsBtn');
+        
+        chatsTab.addEventListener('click', () => {
+            activeTab = 'chats';
+            chatsTab.classList.add('active');
+            contactsTab.classList.remove('active');
+            postsTab.classList.remove('active');
+            chatListDiv.classList.add('active');
+            contactListDiv.classList.remove('active');
+            postListDiv.classList.remove('active');
+            contactSearchBox.style.display = 'none';
+            newGroupBtn.style.display = 'block';
+            newPostBtn.style.display = 'none';
+            chatInputArea.style.display = 'block';
+            groupSettingsBtn.style.display = currentChatId ? 'inline-block' : 'none';
+        });
+        contactsTab.addEventListener('click', async () => {
+            activeTab = 'contacts';
+            chatsTab.classList.remove('active');
+            contactsTab.classList.add('active');
+            postsTab.classList.remove('active');
+            chatListDiv.classList.remove('active');
+            contactListDiv.classList.add('active');
+            postListDiv.classList.remove('active');
+            contactSearchBox.style.display = 'block';
+            newGroupBtn.style.display = 'none';
+            newPostBtn.style.display = 'none';
+            chatInputArea.style.display = 'none';
+            groupSettingsBtn.style.display = 'none';
+            await renderContactList('');
+        });
+        postsTab.addEventListener('click', async () => {
+            activeTab = 'posts';
+            chatsTab.classList.remove('active');
+            contactsTab.classList.remove('active');
+            postsTab.classList.add('active');
+            chatListDiv.classList.remove('active');
+            contactListDiv.classList.remove('active');
+            postListDiv.classList.add('active');
+            contactSearchBox.style.display = 'none';
+            newGroupBtn.style.display = 'none';
+            newPostBtn.style.display = 'block';
+            chatInputArea.style.display = 'none';
+            groupSettingsBtn.style.display = 'none';
+            await renderPostList();
+        });
+        
+        const searchInput = document.getElementById('contactSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => renderContactList(e.target.value));
+        }
+        
+        document.getElementById('logoutBtn')?.addEventListener('click', logout);
+        newGroupBtn.addEventListener('click', createNewGroup);
+        newPostBtn.addEventListener('click', showCreatePostModal);
+        groupSettingsBtn.addEventListener('click', showGroupSettings);
+        
+        await renderChatList();
+        if (currentChatId) {
+            await renderMessageList();
+            const chat = allChats.find(c => c.id === currentChatId);
+            const titleSpan = document.getElementById('chatTitle');
+            if (titleSpan && chat) {
+                if (chat.type === 'group') titleSpan.innerText = chat.name;
+                else {
+                    const other = chat.members.find(m => m !== currentUser);
+                    titleSpan.innerText = `与 ${other} 的私聊`;
+                }
+            }
+            groupSettingsBtn.style.display = 'inline-block';
+        } else {
+            document.getElementById('chatTitle').innerText = '暂无会话，请创建群聊或从通讯录开始私聊';
+        }
+        
+        const sendBtn = document.getElementById('sendBtn');
+        const msgInput = document.getElementById('messageInput');
+        if (sendBtn && msgInput) {
+            sendBtn.onclick = () => doSendMessage(msgInput);
+            msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(msgInput); } });
+        }
+        const fileInput = document.getElementById('fileInput');
+        const fileLabel = document.querySelector('label[title="上传文件"]');
+        if (fileLabel && fileInput) {
+            fileLabel.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => handleFileUpload(e.target));
+        }
+        document.getElementById('drawToolBtn')?.addEventListener('click', openDrawingModal);
+        document.querySelectorAll('.align-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const align = btn.getAttribute('data-align');
+                if (align) {
+                    currentAlignment = align;
+                    document.querySelectorAll('.align-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+            });
+        });
+    }
+    
+    // 启动应用
+    (async function init() {
+        const storedUser = localStorage.getItem('chat_username');
+        if (storedUser) {
+            try {
+                currentUser = storedUser;
+                allUsers = await apiFetch('/users');
+                if (!allUsers.find(u => u.username === storedUser)) throw new Error();
+                const userInfo = allUsers.find(u => u.username === storedUser);
+                socket = io(SOCKET_URL);
+                socket.emit('user_login', storedUser);
+                socket.on('new_message', ({ chatId, message }) => {
+                    if (chatId === currentChatId) renderMessageList();
+                    else renderChatList();
+                });
+                socket.on('group_updated', ({ groupId, newName }) => {
+                    if (groupId === currentChatId) {
+                        const titleSpan = document.getElementById('chatTitle');
+                        if (titleSpan) titleSpan.innerText = newName;
+                    }
+                    renderChatList();
+                });
+                socket.on('group_member_added', () => renderChatList());
+                await loadChats();
+                if (allChats.length > 0) currentChatId = allChats[0].id;
+                renderMainApp({ username: storedUser, nickname: userInfo.nickname });
+            } catch {
+                localStorage.removeItem('chat_username');
+                renderAuth();
+            }
+        } else {
+            renderAuth();
+        }
+    })();
+    
+    window.removePendingFile = removePendingFile;
+</script>
+</body>
+</html>

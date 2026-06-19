@@ -1,0 +1,23 @@
+{
+  "name": "ln-chat",
+  "version": "1.0.0",
+  "description": "LN 实时聊天应用 - 仿微信风格，支持聊天/通讯录/帖子",
+  "main": "railway-deploy/server.js",
+  "scripts": {
+    "start": "node railway-deploy/server.js",
+    "local": "cd data && node server.js",
+    "build": "cd data && pkg server.js --target node18-win-x64 --output ../LN.exe --compress GZip"
+  },
+  "keywords": ["chat", "socket.io", "real-time", "wechat-style"],
+  "author": "xusd2023",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

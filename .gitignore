@@ -1,0 +1,47 @@
+# 依赖
+node_modules/
+*/node_modules/
+*/**/node_modules/
+
+# 可执行文件
+*.exe
+*.msi
+*.dmg
+*.pkg
+
+# 数据文件（用户数据，不提交）
+data/*.json
+data/data/*.json
+!data/package.json
+!data/package-lock.json
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 临时文件
+*.tmp
+*.bak
+*.bak.*
+
+# cloudflared
+cloudflared.exe

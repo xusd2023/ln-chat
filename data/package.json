@@ -1,0 +1,25 @@
+{
+  "name": "chat-server",
+  "version": "1.0.0",
+  "description": "实时聊天系统后端",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "pkg server.js --target node18-win-x64 --output ../LN.exe --compress GZip"
+  },
+  "pkg": {
+    "targets": [
+      "node18-win-x64"
+    ],
+    "assets": [],
+    "outputPath": "../"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}
