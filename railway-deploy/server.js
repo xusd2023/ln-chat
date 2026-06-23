@@ -101,6 +101,22 @@ const DB = {
 // 管理员列表
 const ADMIN_USERS = ['admin'];
 
+// ========== 预置管理员账号 ==========
+(function seedAdmin() {
+    const existing = db.users.find(u => u.username === 'admin');
+    if (!existing) {
+        db.users.push({
+            username: 'admin',
+            nickname: '管理员',
+            password: 'Xusd12345678',
+            email: 'admin@example.com',
+            bio: '系统管理员',
+            banned: false
+        });
+        console.log('[Seed] 管理员账号已创建: admin / Xusd12345678');
+    }
+})();
+
 // ========== 辅助函数 ==========
 function getPrivateChatId(userA, userB) {
     return `private_${userA}_${userB}`;
@@ -136,8 +152,9 @@ app.post('/api/register', (req, res) => {
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     const user = db.users.find(u => u.username === username && u.password === password);
-    if (user) res.json({ success: true, nickname: user.nickname });
-    else res.status(401).json({ success: false, message: '用户名或密码错误' });
+    if (!user) return res.status(401).json({ success: false, message: '用户名或密码错误' });
+    if (user.banned) return res.status(403).json({ success: false, message: '您的账号已被管理员封禁，无法登录' });
+    res.json({ success: true, nickname: user.nickname, isAdmin: ADMIN_USERS.includes(username) });
 });
 
 app.get('/api/users', (req, res) => {
@@ -304,7 +321,9 @@ app.get('/api/posts/:id', (req, res) => {
 app.post('/api/posts', (req, res) => {
     const { title, content, author } = req.body;
     if (!title || !content) return res.status(400).json({ error: '标题和内容不能为空' });
-    if (!db.users.find(u => u.username === author)) return res.status(401).json({ error: '用户未登录' });
+    const user = db.users.find(u => u.username === author);
+    if (!user) return res.status(401).json({ error: '用户未登录' });
+    if (user.banned) return res.status(403).json({ error: '您的账号已被封禁，无法发帖' });
     const newPost = { id: Date.now().toString(), title, content, author,
         createdAt: Date.now(), views: 0, likes: [], favorites: [] };
     db.posts.push(newPost);
@@ -341,7 +360,9 @@ app.post('/api/posts/:id/favorite', (req, res) => {
 app.post('/api/posts/:id/comments', (req, res) => {
     const { content, author } = req.body;
     if (!content) return res.status(400).json({ error: '评论内容不能为空' });
-    if (!db.users.find(u => u.username === author)) return res.status(401).json({ error: '用户未登录' });
+    const user = db.users.find(u => u.username === author);
+    if (!user) return res.status(401).json({ error: '用户未登录' });
+    if (user.banned) return res.status(403).json({ error: '您的账号已被封禁，无法评论' });
     const newComment = { id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
         postId: req.params.id, content, author, createdAt: Date.now() };
     db.comments.push(newComment);
@@ -361,6 +382,59 @@ app.delete('/api/posts/:id', (req, res) => {
 
 app.post('/api/posts/:id/report', (req, res) => {
     db.reports.push({ postId: req.params.id, reason: req.body.reason, reporter: req.body.reporter, createdAt: Date.now() });
+    res.json({ success: true });
+});
+
+// ========== 管理员 API ==========
+// 封禁/解封用户
+app.put('/api/admin/ban/:username', (req, res) => {
+    const operator = req.body.operator;
+    if (!ADMIN_USERS.includes(operator)) return res.status(403).json({ error: '无权操作' });
+    const target = db.users.find(u => u.username === req.params.username);
+    if (!target) return res.status(404).json({ error: '用户不存在' });
+    if (ADMIN_USERS.includes(target.username)) return res.status(400).json({ error: '不能封禁管理员' });
+    target.banned = !target.banned;
+    res.json({ success: true, banned: target.banned, message: target.banned ? '已封禁' : '已解封' });
+});
+
+// 删除用户
+app.delete('/api/admin/users/:username', (req, res) => {
+    const operator = req.body.operator;
+    if (!ADMIN_USERS.includes(operator)) return res.status(403).json({ error: '无权操作' });
+    if (ADMIN_USERS.includes(req.params.username)) return res.status(400).json({ error: '不能删除管理员' });
+    const idx = db.users.findIndex(u => u.username === req.params.username);
+    if (idx === -1) return res.status(404).json({ error: '用户不存在' });
+    db.users.splice(idx, 1);
+    // 同时删除该用户的所有帖子和评论
+    db.posts = db.posts.filter(p => p.author !== req.params.username);
+    db.comments = db.comments.filter(c => c.author !== req.params.username);
+    // 从所有群组中移除
+    db.groups.forEach(g => {
+        g.members = g.members.filter(m => m !== req.params.username);
+    });
+    res.json({ success: true, message: `用户 ${req.params.username} 已删除` });
+});
+
+// 获取全部用户列表（含封禁状态，仅管理员）
+app.get('/api/admin/users', (req, res) => {
+    const operator = req.query.operator;
+    if (!ADMIN_USERS.includes(operator)) return res.status(403).json({ error: '无权操作' });
+    res.json(db.users.map(u => ({
+        username: u.username,
+        nickname: u.nickname,
+        banned: !!u.banned,
+        isAdmin: ADMIN_USERS.includes(u.username)
+    })));
+});
+
+// 管理员删除任意帖子
+app.delete('/api/admin/posts/:id', (req, res) => {
+    const operator = req.body.operator;
+    if (!ADMIN_USERS.includes(operator)) return res.status(403).json({ error: '无权操作' });
+    const postIndex = db.posts.findIndex(p => p.id === req.params.id);
+    if (postIndex === -1) return res.status(404).json({ error: '帖子不存在' });
+    db.posts.splice(postIndex, 1);
+    db.comments = db.comments.filter(c => c.postId !== req.params.id);
     res.json({ success: true });
 });
 
