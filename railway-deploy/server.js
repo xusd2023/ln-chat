@@ -158,22 +158,28 @@ app.post('/api/login', (req, res) => {
 });
 
 app.get('/api/users', (req, res) => {
-    res.json(db.users.map(u => ({ username: u.username, nickname: u.nickname, bio: u.bio || '' })));
+    res.json(db.users.map(u => ({ username: u.username, nickname: u.nickname, bio: u.bio || '', avatar: u.avatar || '' })));
 });
 
 app.get('/api/users/:username', (req, res) => {
     const user = db.users.find(u => u.username === req.params.username);
     if (!user) return res.status(404).json({ error: '用户不存在' });
-    res.json({ username: user.username, nickname: user.nickname, bio: user.bio || '' });
+    res.json({ username: user.username, nickname: user.nickname, bio: user.bio || '', avatar: user.avatar || '' });
 });
 
 app.put('/api/users/:username', (req, res) => {
     const user = db.users.find(u => u.username === req.params.username);
     if (!user) return res.status(404).json({ error: '用户不存在' });
-    const { nickname, bio } = req.body;
-    if (nickname) user.nickname = nickname;
+    const { nickname, bio, avatar, password, oldPassword } = req.body;
+    if (nickname !== undefined) user.nickname = nickname;
     if (bio !== undefined) user.bio = bio;
-    res.json({ success: true, nickname: user.nickname, bio: user.bio });
+    if (avatar !== undefined) user.avatar = avatar;
+    if (password !== undefined) {
+        if (user.password !== oldPassword) return res.status(403).json({ error: '旧密码不正确' });
+        if (!password || password.length < 4) return res.status(400).json({ error: '新密码至少4个字符' });
+        user.password = password;
+    }
+    res.json({ success: true, nickname: user.nickname, bio: user.bio, avatar: user.avatar || '' });
 });
 
 app.get('/api/users/:username/liked-posts', (req, res) => {

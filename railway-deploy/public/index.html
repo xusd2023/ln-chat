@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LN Chat 2.0 - 聊天/通讯录/帖子</title>
+    <title>LN Chat 3.0 - 聊天/通讯录/帖子</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js"></script>
@@ -12,9 +12,9 @@
     <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     <style>
         :root {
-            --primary: #07c160;
-            --primary-dark: #05a14e;
-            --primary-light: #e6f9ee;
+            --primary: #1677ff;
+            --primary-dark: #0958d9;
+            --primary-light: #e6f4ff;
             --accent: #667eea;
             --accent-dark: #5a6fd6;
             --danger: #ff4d4f;
@@ -65,7 +65,7 @@
         }
         .top-nav-brand {
             font-size: 18px; font-weight: 800;
-            background: linear-gradient(135deg, var(--primary), #38d98e);
+            background: linear-gradient(135deg, var(--primary), #69b1ff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -168,7 +168,7 @@
             margin-right: 12px; font-size: 20px; color: white;
             flex-shrink: 0; box-shadow: var(--shadow-sm);
         }
-        .conv-avatar { background: linear-gradient(135deg, var(--primary), #38d98e); }
+        .conv-avatar { background: linear-gradient(135deg, var(--primary), #69b1ff); }
         .contact-avatar { background: linear-gradient(135deg, #9b59b6, #c39bd3); }
 
         .conv-info, .contact-info { flex: 1; min-width: 0; }
@@ -197,7 +197,7 @@
         .search-input:focus {
             border-color: var(--primary);
             background-color: var(--bg-white);
-            box-shadow: 0 0 0 3px rgba(7,193,96,0.12);
+            box-shadow: 0 0 0 3px rgba(22,119,255,0.12);
         }
         .search-input::placeholder { color: #bbb; }
 
@@ -292,7 +292,7 @@
         .tool-btn:hover { color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
         .align-selector { display: flex; gap: 4px; background: var(--bg-sidebar); padding: 3px 6px; border-radius: var(--radius-xl); border: 1px solid var(--border-color); }
         .align-btn { background: none; border: none; cursor: pointer; font-size: 13px; padding: 4px 10px; border-radius: 16px; color: var(--text-secondary); transition: var(--transition); font-weight: 500; }
-        .align-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(7,193,96,0.3); }
+        .align-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(22,119,255,0.3); }
         .text-input {
             width: 100%; border: 1.5px solid var(--border-color);
             border-radius: var(--radius-lg); padding: 10px 16px;
@@ -300,7 +300,7 @@
             outline: none; transition: var(--transition);
             line-height: 1.5; color: var(--text-primary);
         }
-        .text-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(7,193,96,0.12); }
+        .text-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(22,119,255,0.12); }
         .text-input::placeholder { color: #bbb; }
         .send-btn {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -308,9 +308,9 @@
             border-radius: var(--radius-xl); margin-top: 8px;
             cursor: pointer; font-weight: 700; font-size: 14px;
             transition: var(--transition);
-            box-shadow: 0 2px 8px rgba(7,193,96,0.3); float: right;
+            box-shadow: 0 2px 8px rgba(22,119,255,0.3); float: right;
         }
-        .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(7,193,96,0.4); }
+        .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22,119,255,0.4); }
         .send-btn:active { transform: translateY(0); }
 
         /* ===== File List ===== */
@@ -427,17 +427,17 @@
         .auth-tab.active::after { width: 80%; }
         .auth-form { display: flex; flex-direction: column; gap: 16px; }
         .auth-input { padding: 12px 16px; border: 1.5px solid var(--border-color); border-radius: var(--radius-xl); font-size: 15px; outline: none; transition: var(--transition); background: #fafbfc; color: var(--text-primary); }
-        .auth-input:focus { border-color: var(--primary); background: var(--bg-white); box-shadow: 0 0 0 3px rgba(7,193,96,0.12); }
+        .auth-input:focus { border-color: var(--primary); background: var(--bg-white); box-shadow: 0 0 0 3px rgba(22,119,255,0.12); }
         .auth-input::placeholder { color: #bbb; }
         .auth-btn {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white; border: none; padding: 12px;
             border-radius: var(--radius-xl); font-size: 15px; cursor: pointer;
             font-weight: 700; transition: var(--transition);
-            box-shadow: 0 3px 10px rgba(7,193,96,0.3);
+            box-shadow: 0 3px 10px rgba(22,119,255,0.3);
             letter-spacing: 0.5px;
         }
-        .auth-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(7,193,96,0.4); }
+        .auth-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(22,119,255,0.4); }
         .auth-btn:active { transform: translateY(0); }
         .error-msg { color: var(--danger); font-size: 13px; margin-top: 8px; font-weight: 500; }
 
@@ -448,9 +448,9 @@
             border-radius: var(--radius-lg); cursor: pointer; font-weight: 600;
             margin: 10px 14px; width: calc(100% - 28px);
             font-size: 14px; transition: var(--transition);
-            box-shadow: 0 2px 8px rgba(7,193,96,0.25);
+            box-shadow: 0 2px 8px rgba(22,119,255,0.25);
         }
-        .new-group-btn:hover, .new-post-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(7,193,96,0.35); }
+        .new-group-btn:hover, .new-post-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(22,119,255,0.35); }
 
         /* ===== Post Card ===== */
         .post-card {
@@ -491,7 +491,7 @@
 
         /* ===== Inline Input ===== */
         .inline-input { width: 100%; padding: 9px 14px; margin-top: 8px; border: 1.5px solid var(--border-color); border-radius: var(--radius-lg); font-size: 14px; outline: none; transition: var(--transition); color: var(--text-primary); }
-        .inline-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(7,193,96,0.12); }
+        .inline-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(22,119,255,0.12); }
 
         /* ===== Canvas ===== */
         canvas { border: 1.5px solid var(--border-color); background: white; margin: 10px 0; width: 100%; height: auto; border-radius: var(--radius-sm); cursor: crosshair; }
@@ -511,7 +511,7 @@
         .draw-toolbar .dt-btn.active-tool { background: #c8e6d9; box-shadow: inset 0 0 0 2px var(--primary); }
         .draw-actions { margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
         .draw-save-btn { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:white; border:none; padding:7px 18px; border-radius:var(--radius-xl); cursor:pointer; font-weight:600; transition:var(--transition); font-size:13px; }
-        .draw-save-btn:hover { box-shadow:0 2px 8px rgba(7,193,96,0.4); transform:translateY(-1px); }
+        .draw-save-btn:hover { box-shadow:0 2px 8px rgba(22,119,255,0.4); transform:translateY(-1px); }
         .draw-cancel-btn { background:#f0f0f0; color:var(--text-secondary); border:1.5px solid var(--border-color); padding:7px 18px; border-radius:var(--radius-xl); cursor:pointer; font-weight:500; transition:var(--transition); font-size:13px; }
         .draw-cancel-btn:hover { background:#e8e8e8; }
 
@@ -522,8 +522,8 @@
         .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
         .modal-btn-cancel { background:#f0f0f0; color:var(--text-secondary); border:1.5px solid var(--border-color); padding:7px 16px; border-radius:var(--radius-xl); cursor:pointer; font-weight:500; transition:var(--transition); }
         .modal-btn-cancel:hover { background:#e8e8e8; }
-        .modal-btn-confirm { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:white; border:none; padding:7px 16px; border-radius:var(--radius-xl); cursor:pointer; font-weight:600; transition:var(--transition); box-shadow:0 2px 6px rgba(7,193,96,0.25); }
-        .modal-btn-confirm:hover { box-shadow:0 4px 12px rgba(7,193,96,0.35); transform:translateY(-1px); }
+        .modal-btn-confirm { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:white; border:none; padding:7px 16px; border-radius:var(--radius-xl); cursor:pointer; font-weight:600; transition:var(--transition); box-shadow:0 2px 6px rgba(22,119,255,0.25); }
+        .modal-btn-confirm:hover { box-shadow:0 4px 12px rgba(22,119,255,0.35); transform:translateY(-1px); }
         .danger-btn-confirm { background:linear-gradient(135deg, var(--danger), #ff7875); color:white; border:none; padding:7px 16px; border-radius:var(--radius-xl); cursor:pointer; font-weight:600; transition:var(--transition); box-shadow:0 2px 6px rgba(255,77,79,0.25); }
         .danger-btn-confirm:hover { box-shadow:0 4px 12px rgba(255,77,79,0.35); transform:translateY(-1px); }
 
@@ -543,6 +543,20 @@
         .changelog-section h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary); }
         .changelog-section ul { padding-left: 20px; }
         .changelog-section li { font-size: 14px; line-height: 1.8; color: var(--text-secondary); }
+
+        /* ===== Profile ===== */
+        .profile-section { display: flex; justify-content: center; padding: 16px 0; }
+        .profile-avatar-area { display: flex; flex-direction: column; align-items: center; }
+        .profile-avatar {
+            width: 120px; height: 120px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #69b1ff);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700;
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+        }
+        .form-group { padding: 16px 0; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: var(--text-primary); }
 
         /* ===== Responsive ===== */
         @media (max-width: 768px) {
@@ -688,7 +702,7 @@
     
     // ===== 绘图工具 =====
     let drawingModalElement = null, drawingCanvas = null, drawingCtx = null;
-    let currentTool = 'pen', drawingColor = '#07c160';
+    let currentTool = 'pen', drawingColor = '#1677ff';
     let isDrawing = false, lastX = 0, lastY = 0;
     
     function drawStar(ctx, cx, cy, spikes, outerR, innerR, color) {
@@ -756,7 +770,7 @@
                     <button id="toolCircle" class="dt-btn">⚪ 圆形</button>
                     <button id="toolTriangle" class="dt-btn">🔺 三角形</button>
                     <button id="toolStar" class="dt-btn">⭐ 五角星</button>
-                    <input type="color" id="drawColorPicker" value="#07c160">
+                    <input type="color" id="drawColorPicker" value="#1677ff">
                     <button id="clearCanvasBtn" class="dt-btn">🗑️ 清空</button>
                 </div>
                 <canvas id="drawCanvas" width="500" height="400"></canvas>
@@ -875,7 +889,7 @@
         if (groups.length) {
             html += `<div style="padding:8px 12px; font-size:14px; color:#666;">群聊</div>`;
             groups.forEach(chat => {
-                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="group"><div class="conv-avatar" style="background:#07c160;">👥</div><div class="conv-info"><div class="conv-name">${escapeHtml(chat.name)}</div><div class="conv-preview">${chat.members.length}人</div></div></div>`;
+                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="group"><div class="conv-avatar" style="background:var(--primary);">👥</div><div class="conv-info"><div class="conv-name">${escapeHtml(chat.name)}</div><div class="conv-preview">${chat.members.length}人</div></div></div>`;
             });
         }
         if (privates.length) {
@@ -994,6 +1008,7 @@
             case 'postDetail': renderPostDetailPage(data); break;
             case 'adminPanel': renderAdminPanelPage(); break;
             case 'changelog': renderChangelogPage(); break;
+            case 'profile': renderProfilePage(); break;
         }
     }
     
@@ -1007,7 +1022,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 2.0</span>
+                <span class="top-nav-brand">LN Chat 3.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1056,7 +1071,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 2.0</span>
+                <span class="top-nav-brand">LN Chat 3.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1077,7 +1092,7 @@
                     goBack();
                 } catch (err) { alert('添加失败：' + err.message); }
             });
-            el.addEventListener('mouseenter', () => el.style.background = '#e6f9ee');
+            el.addEventListener('mouseenter', () => el.style.background = '#e6f4ff');
             el.addEventListener('mouseleave', () => el.style.background = '');
         });
     }
@@ -1092,7 +1107,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 2.0</span>
+                <span class="top-nav-brand">LN Chat 3.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1129,7 +1144,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 2.0</span>
+                <span class="top-nav-brand">LN Chat 3.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1197,7 +1212,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 2.0</span>
+                <span class="top-nav-brand">LN Chat 3.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">🔧 管理员面板</span></div>
             </div>
@@ -1276,24 +1291,175 @@
         });
     }
     
+    // ===== 个人主页 =====
+    async function renderProfilePage() {
+        const userInfo = allUsers.find(u => u.username === currentUser);
+        const avatarData = userInfo?.avatar || '';
+        const root = document.getElementById('root');
+        root.innerHTML = `
+            <div class="top-nav">
+                <span class="top-nav-brand">LN Chat 3.0</span>
+                <div class="top-nav-tabs"></div>
+                <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
+            </div>
+            <div class="page-container">
+                <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">个人主页</span></div>
+                <div class="page-body">
+                    <div class="profile-section">
+                        <div class="profile-avatar-area">
+                            <div id="avatarPreview" class="profile-avatar">
+                                ${avatarData ? `<img src="${avatarData}" alt="头像" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : `<span style="font-size:40px;">${(userInfo?.nickname || currentUser).charAt(0)}</span>`}
+                            </div>
+                            <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+                            <button id="uploadAvatarBtn" class="top-nav-btn" style="margin-top:12px;">📷 更换头像</button>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" value="${escapeHtml(currentUser)}" disabled class="inline-input" style="background:#f5f5f5;">
+                        <span style="font-size:12px;color:#999;">用户名不可修改</span>
+                    </div>
+                    <hr>
+                    <div class="form-group">
+                        <label>昵称</label>
+                        <input type="text" id="profileNickname" value="${escapeHtml(userInfo?.nickname || '')}" class="inline-input">
+                        <button id="saveNicknameBtn" class="modal-btn-confirm">保存昵称</button>
+                    </div>
+                    <hr>
+                    <div class="form-group">
+                        <label style="font-weight:700;color:var(--danger);">修改密码</label>
+                        <input type="password" id="oldPassword" placeholder="输入旧密码" class="inline-input">
+                        <input type="password" id="newPassword" placeholder="输入新密码（至少4位）" class="inline-input">
+                        <input type="password" id="confirmPassword" placeholder="确认新密码" class="inline-input">
+                        <button id="changePwdBtn" class="modal-btn-confirm" style="margin-top:8px;">修改密码</button>
+                    </div>
+                    <div id="profileMsg" style="margin-top:12px;text-align:center;font-size:14px;"></div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('backBtn').addEventListener('click', goBack);
+        
+        document.getElementById('uploadAvatarBtn')?.addEventListener('click', () => {
+            document.getElementById('avatarInput').click();
+        });
+        
+        document.getElementById('avatarInput')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 1024 * 1024) { showMsg('图片不能超过1MB', 'error'); return; }
+            const base64 = await fileToBase64(file);
+            try {
+                const result = await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { avatar: base64 } });
+                userInfo.avatar = base64;
+                const preview = document.getElementById('avatarPreview');
+                preview.innerHTML = `<img src="${base64}" alt="头像" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+                showMsg('头像已更新');
+            } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
+        });
+        
+        document.getElementById('saveNicknameBtn')?.addEventListener('click', async () => {
+            const nickname = document.getElementById('profileNickname').value.trim();
+            if (!nickname) { showMsg('昵称不能为空', 'error'); return; }
+            try {
+                await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { nickname } });
+                userInfo.nickname = nickname;
+                showMsg('昵称已更新');
+            } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
+        });
+        
+        document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
+            const oldPwd = document.getElementById('oldPassword').value;
+            const newPwd = document.getElementById('newPassword').value.trim();
+            const confirmPwd = document.getElementById('confirmPassword').value.trim();
+            if (!oldPwd) { showMsg('请输入旧密码', 'error'); return; }
+            if (!newPwd || newPwd.length < 4) { showMsg('新密码至少4个字符', 'error'); return; }
+            if (newPwd !== confirmPwd) { showMsg('两次密码输入不一致', 'error'); return; }
+            try {
+                await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { password: newPwd, oldPassword: oldPwd } });
+                showMsg('密码已修改');
+                document.getElementById('oldPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+            } catch (err) { showMsg('修改失败：' + err.message, 'error'); }
+        });
+        
+        function showMsg(text, type) {
+            const el = document.getElementById('profileMsg');
+            if (el) { el.innerText = text; el.style.color = type === 'error' ? 'var(--danger)' : 'var(--primary)'; }
+        }
+    }
+    
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxSize = 200;
+                    let w = img.width, h = img.height;
+                    if (w > h) { if (w > maxSize) { h *= maxSize / w; w = maxSize; } }
+                    else { if (h > maxSize) { w *= maxSize / h; h = maxSize; } }
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL('image/jpeg', 0.8));
+                };
+                img.onerror = reject;
+                img.src = reader.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    
     // ===== 更新日志 =====
     function renderChangelogPage() {
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 2.0</span>
+                <span class="top-nav-brand">LN Chat 3.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
             <div class="page-container">
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">更新日志</span></div>
                 <div class="page-body">
-                    <div class="changelog-version">Version 2.0</div>
-                    <div class="changelog-date">2026年5月17日</div>
+                    <div class="changelog-version">Beta 3.0</div>
+                    <div class="changelog-date">2026年6月25日</div>
+                    <div class="changelog-section">
+                        <h4>🎨 UI 优化</h4>
+                        <ul>
+                            <li><strong>蓝色简约风格</strong>：整体 UI 从绿色主题更新为清爽的蓝色调，视觉更现代、专业</li>
+                            <li><strong>统一配色</strong>：主色 #1677ff，导航栏、按钮、选中态、渐变背景全面焕新</li>
+                            <li><strong>品牌升级</strong>：LN Chat 正式迈入 3.0 时代，蓝色更显稳重与专业</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>👤 个人主页</h4>
+                        <ul>
+                            <li><strong>头像设置</strong>：支持上传自定义头像，自动裁剪为圆形展示</li>
+                            <li><strong>昵称修改</strong>：可随时修改个人昵称，即时生效</li>
+                            <li><strong>密码修改</strong>：支持修改登录密码，需验证旧密码确保安全</li>
+                            <li><strong>便捷入口</strong>：顶部导航栏新增"个人主页"按钮，一键进入</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>📋 更新日志优化</h4>
+                        <ul>
+                            <li>更新日志格式优化，按 Beta 版本归类，增加日期标注</li>
+                            <li>格式更清晰美观，变更内容一目了然</li>
+                        </ul>
+                    </div>
+                    <hr>
+                    <div class="changelog-version" style="margin-top: 40px; font-size: 22px;">Beta 2.0</div>
+                    <div class="changelog-date">2026年6月23日</div>
                     <div class="changelog-section">
                         <h4>🛡️ 管理员功能（全新）</h4>
                         <ul>
-                            <li><strong>预设管理员账号</strong>：用户名 <code>admin</code>，密码 <code>Xusd12345678</code></li>
+                            <li><strong>预设管理员账号</strong>：用户名 <code>admin</code>（密码请联系系统管理员获取）</li>
                             <li><strong>用户管理</strong>：管理员可封禁/解封用户，被封禁用户无法发帖和评论</li>
                             <li><strong>帖子管理</strong>：管理员可删除任意帖子及其评论</li>
                             <li><strong>账号管理</strong>：管理员可永久删除用户账号，同时清理其所有帖子和评论</li>
@@ -1306,6 +1472,7 @@
                             <li><strong>顶部导航栏</strong>：将"聊天""通讯录""帖子"标签移至顶部，操作更便捷</li>
                             <li><strong>页面化设计</strong>：群聊设置、添加成员、发布帖子、帖子详情等改为独立页面，操作完成后自动跳转</li>
                             <li><strong>返回导航</strong>：所有子页面均包含返回按钮，操作流畅自然</li>
+                            <li><strong>流畅动画</strong>：过渡动画和悬停效果优化，交互体验更丝滑</li>
                         </ul>
                     </div>
                     <div class="changelog-section">
@@ -1420,13 +1587,14 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 2.0</span>
+                <span class="top-nav-brand">LN Chat 3.0</span>
                 <div class="top-nav-tabs">
                     <div class="top-nav-tab active" data-tab="chats">💬 聊天</div>
                     <div class="top-nav-tab" data-tab="contacts">👥 通讯录</div>
                     <div class="top-nav-tab" data-tab="posts">📝 帖子</div>
                 </div>
                 <div class="top-nav-actions">
+                    <button id="profileBtn" class="top-nav-btn">👤 个人主页</button>
                     ${isAdmin ? '<button id="adminPanelBtn" class="top-nav-btn admin-btn">🛡️ 管理</button>' : ''}
                     <button id="changelogBtn" class="top-nav-btn">📋 更新日志</button>
                     <button id="logoutBtn" class="top-nav-btn danger-btn">退出</button>
@@ -1531,6 +1699,7 @@
         if (searchInput) searchInput.addEventListener('input', (e) => renderContactList(e.target.value));
         
         document.getElementById('logoutBtn')?.addEventListener('click', logout);
+        document.getElementById('profileBtn')?.addEventListener('click', () => showPage('profile'));
         document.getElementById('changelogBtn')?.addEventListener('click', () => showPage('changelog'));
         if (isAdmin) document.getElementById('adminPanelBtn')?.addEventListener('click', () => showPage('adminPanel'));
         newGroupBtn.addEventListener('click', createNewGroup);
