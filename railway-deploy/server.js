@@ -241,7 +241,7 @@ app.post('/api/messages/:chatId', (req, res) => {
     const newMsg = {
         id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
         text, attachments, alignment,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toISOString(),
         sender
     };
     db.messages[chatId].push(newMsg);

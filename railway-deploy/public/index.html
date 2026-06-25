@@ -603,6 +603,12 @@
         });
     }
     
+    function formatLocalTime(isoString) {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return isoString;
+        return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+    
     async function apiFetch(url, options = {}) {
         const response = await fetch(API_BASE + url, {
             headers: { 'Content-Type': 'application/json' },
@@ -872,7 +878,7 @@
                 }
                 return '';
             }).join('');
-            return `<div class="message-wrapper align-${msg.alignment}"><div class="message-bubble"><div class="message-content">${richHtml}</div>${attachmentsHtml ? `<div class="attachments-area">${attachmentsHtml}</div>` : ''}<div class="message-meta"><span>${escapeHtml(displayName)}</span><span>${msg.timestamp}</span></div></div></div>`;
+            return `<div class="message-wrapper align-${msg.alignment}"><div class="message-bubble"><div class="message-content">${richHtml}</div>${attachmentsHtml ? `<div class="attachments-area">${attachmentsHtml}</div>` : ''}<div class="message-meta"><span>${escapeHtml(displayName)}</span><span>${formatLocalTime(msg.timestamp)}</span></div></div></div>`;
         }).join('');
         renderLatexInContainer(listContainer);
         listContainer.scrollTop = listContainer.scrollHeight;
