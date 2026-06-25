@@ -212,7 +212,12 @@ app.get('/api/users/:username/favorited-posts', (req, res) => {
 app.get('/api/chats/:username', (req, res) => {
     const { username } = req.params;
     const groups = db.groups.filter(g => g.members.includes(username));
-    const userPrivateChats = Object.values(db.privateChats).filter(c => c.members.includes(username));
+    // 仅返回双方用户都存在的私聊（防止显示已删除用户的私聊）
+    const userPrivateChats = Object.values(db.privateChats).filter(c => {
+        if (!c.members.includes(username)) return false;
+        const otherUser = c.members.find(m => m !== username);
+        return otherUser && db.users.find(u => u.username === otherUser);
+    });
     res.json([...groups, ...userPrivateChats]);
 });
 
@@ -223,6 +228,15 @@ app.get('/api/messages/:chatId', (req, res) => {
 app.post('/api/messages/:chatId', (req, res) => {
     const { chatId } = req.params;
     const { text, attachments, alignment, sender } = req.body;
+    // 检查私聊接收者是否仍然存在
+    const privateChat = db.privateChats[chatId];
+    if (privateChat) {
+        for (const member of privateChat.members) {
+            if (member !== sender && !db.users.find(u => u.username === member)) {
+                return res.status(410).json({ error: `用户 ${member} 不存在或已被删除，无法发送消息` });
+            }
+        }
+    }
     if (!db.messages[chatId]) db.messages[chatId] = [];
     const newMsg = {
         id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
@@ -292,7 +306,11 @@ app.post('/api/chats/:chatId/nickname', (req, res) => {
 });
 
 app.post('/api/private', (req, res) => {
-    const chat = ensurePrivateChat(req.body.userA, req.body.userB);
+    const { userA, userB } = req.body;
+    // 检查双方用户是否存在（防止给已删除用户发私聊）
+    if (!db.users.find(u => u.username === userA)) return res.status(404).json({ error: `用户 ${userA} 不存在或已被删除` });
+    if (!db.users.find(u => u.username === userB)) return res.status(404).json({ error: `用户 ${userB} 不存在或已被删除` });
+    const chat = ensurePrivateChat(userA, userB);
     res.json(chat);
 });
 
@@ -410,15 +428,36 @@ app.delete('/api/admin/users/:username', (req, res) => {
     if (ADMIN_USERS.includes(req.params.username)) return res.status(400).json({ error: '不能删除管理员' });
     const idx = db.users.findIndex(u => u.username === req.params.username);
     if (idx === -1) return res.status(404).json({ error: '用户不存在' });
+    const deletedUser = req.params.username;
     db.users.splice(idx, 1);
     // 同时删除该用户的所有帖子和评论
-    db.posts = db.posts.filter(p => p.author !== req.params.username);
-    db.comments = db.comments.filter(c => c.author !== req.params.username);
+    db.posts = db.posts.filter(p => p.author !== deletedUser);
+    db.comments = db.comments.filter(c => c.author !== deletedUser);
     // 从所有群组中移除
     db.groups.forEach(g => {
-        g.members = g.members.filter(m => m !== req.params.username);
+        g.members = g.members.filter(m => m !== deletedUser);
     });
-    res.json({ success: true, message: `用户 ${req.params.username} 已删除` });
+    // 清理所有涉及该用户的私聊记录（被删用户禁止再接收消息）
+    const privateChatIdsToDelete = [];
+    for (const chatId of Object.keys(db.privateChats)) {
+        const chat = db.privateChats[chatId];
+        if (chat.members.includes(deletedUser)) {
+            privateChatIdsToDelete.push(chatId);
+            // 通知另一个用户：对方已注销
+            const otherUser = chat.members.find(m => m !== deletedUser);
+            if (otherUser) {
+                io.to(`user_${otherUser}`).emit('user_deleted', {
+                    username: deletedUser,
+                    chatId: chat.id
+                });
+            }
+        }
+    }
+    privateChatIdsToDelete.forEach(id => {
+        delete db.privateChats[id];
+        delete db.messages[id];
+    });
+    res.json({ success: true, message: `用户 ${deletedUser} 已删除` });
 });
 
 // 获取全部用户列表（含封禁状态，仅管理员）

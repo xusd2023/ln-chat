@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LN Chat 3.0 - 聊天/通讯录/帖子</title>
+    <title>LN-chat  聊天社区</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js"></script>
@@ -822,7 +822,16 @@
     // ===== 聊天核心 =====
     async function sendMessage(text, attachments, alignment, chatId, sender) {
         try { return await apiFetch(`/messages/${chatId}`, { method: 'POST', body: { text, attachments, alignment, sender } }); }
-        catch (err) { alert('发送失败：' + err.message); }
+        catch (err) {
+            alert('发送失败：' + err.message);
+            // 如果接收者已被删除，刷新聊天列表
+            if (err.message.includes('不存在或已被删除')) {
+                await loadChats();
+                allUsers = await apiFetch('/users');
+                renderMainApp({ username: currentUser, nickname: allUsers.find(u => u.username === currentUser)?.nickname || currentUser });
+            }
+            throw err;
+        }
     }
     
     async function doSendMessage(inputEl) {
@@ -1508,6 +1517,15 @@
                 renderChatList();
             });
             socket.on('group_member_added', () => { renderChatList(); });
+            socket.on('user_deleted', async ({ username, chatId }) => {
+                alert(`用户「${username}」已被管理员删除，相关私聊已关闭。`);
+                await loadChats();
+                allUsers = await apiFetch('/users');
+                if (currentChatId === chatId) {
+                    currentChatId = allChats.length > 0 ? allChats[0].id : null;
+                }
+                renderMainApp({ username: currentUser, nickname: allUsers.find(u => u.username === currentUser)?.nickname || currentUser });
+            });
             await loadChats();
             if (allChats.length > 0) currentChatId = allChats[0].id;
             renderMainApp({ username, nickname: data.nickname });
@@ -1758,6 +1776,15 @@
                     renderChatList();
                 });
                 socket.on('group_member_added', () => renderChatList());
+                socket.on('user_deleted', async ({ username, chatId }) => {
+                    alert(`用户「${username}」已被管理员删除，相关私聊已关闭。`);
+                    await loadChats();
+                    allUsers = await apiFetch('/users');
+                    if (currentChatId === chatId) {
+                        currentChatId = allChats.length > 0 ? allChats[0].id : null;
+                    }
+                    renderMainApp({ username: storedUser, nickname: userInfo.nickname });
+                });
                 await loadChats();
                 if (allChats.length > 0) currentChatId = allChats[0].id;
                 renderMainApp({ username: storedUser, nickname: userInfo.nickname });
