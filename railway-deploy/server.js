@@ -15,7 +15,7 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '8mb' }));  // 支持 base64 头像（压缩后约 ~50KB）
 
 // ========== 静态文件托管（前端页面）==========
 // 优先尝试 public/ 目录，否则直接读 index.html
@@ -42,7 +42,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
     storage,
-    limits: { fileSize: 200 * 1024 * 1024 } // 200MB 单文件限制
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB 单文件限制（防止服务器内存耗尽）
 });
 
 // 文件上传接口
@@ -343,13 +343,13 @@ app.get('/api/posts/:id', (req, res) => {
 });
 
 app.post('/api/posts', (req, res) => {
-    const { title, content, author } = req.body;
+    const { title, content, author, attachments } = req.body;
     if (!title || !content) return res.status(400).json({ error: '标题和内容不能为空' });
     const user = db.users.find(u => u.username === author);
     if (!user) return res.status(401).json({ error: '用户未登录' });
     if (user.banned) return res.status(403).json({ error: '您的账号已被封禁，无法发帖' });
     const newPost = { id: Date.now().toString(), title, content, author,
-        createdAt: Date.now(), views: 0, likes: [], favorites: [] };
+        createdAt: Date.now(), views: 0, likes: [], favorites: [], attachments: attachments || [] };
     db.posts.push(newPost);
     res.json(newPost);
 });
@@ -382,13 +382,17 @@ app.post('/api/posts/:id/favorite', (req, res) => {
 });
 
 app.post('/api/posts/:id/comments', (req, res) => {
-    const { content, author } = req.body;
+    const { content, author, replyTo, attachments } = req.body;
     if (!content) return res.status(400).json({ error: '评论内容不能为空' });
     const user = db.users.find(u => u.username === author);
     if (!user) return res.status(401).json({ error: '用户未登录' });
     if (user.banned) return res.status(403).json({ error: '您的账号已被封禁，无法评论' });
     const newComment = { id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-        postId: req.params.id, content, author, createdAt: Date.now() };
+        postId: req.params.id, content, author, createdAt: Date.now(),
+        replyTo: replyTo || null,
+        attachments: attachments || [],
+        likes: []
+    };
     db.comments.push(newComment);
     res.json(newComment);
 });
@@ -406,6 +410,40 @@ app.delete('/api/posts/:id', (req, res) => {
 
 app.post('/api/posts/:id/report', (req, res) => {
     db.reports.push({ postId: req.params.id, reason: req.body.reason, reporter: req.body.reporter, createdAt: Date.now() });
+    res.json({ success: true });
+});
+
+// 评论点赞
+app.post('/api/comments/:id/like', (req, res) => {
+    const comment = db.comments.find(c => c.id === req.params.id);
+    if (!comment) return res.status(404).json({ error: '评论不存在' });
+    if (!comment.likes) comment.likes = [];
+    const index = comment.likes.indexOf(req.body.username);
+    if (index === -1) comment.likes.push(req.body.username);
+    else comment.likes.splice(index, 1);
+    res.json({ success: true, liked: index === -1, likeCount: comment.likes.length });
+});
+
+// 消息撤回（仅发送者本人，2分钟内）
+app.delete('/api/messages/:chatId/:msgId', (req, res) => {
+    const { chatId, msgId } = req.params;
+    const { operator } = req.body;
+    const msgs = db.messages[chatId];
+    if (!msgs) return res.status(404).json({ error: '会话不存在' });
+    const idx = msgs.findIndex(m => m.id === msgId);
+    if (idx === -1) return res.status(404).json({ error: '消息不存在' });
+    const msg = msgs[idx];
+    if (msg.sender !== operator && !ADMIN_USERS.includes(operator)) return res.status(403).json({ error: '只能撤回自己的消息' });
+    const ageMs = Date.now() - new Date(msg.timestamp).getTime();
+    if (ageMs > 2 * 60 * 1000 && !ADMIN_USERS.includes(operator)) return res.status(400).json({ error: '超过2分钟无法撤回' });
+    // 标记为已撤回而不是直接删除（保留占位）
+    msg.recalled = true;
+    msg.text = '[消息已撤回]';
+    msg.attachments = [];
+    // 通知该会话所有成员
+    const allChatsArr = [...db.groups, ...Object.values(db.privateChats)];
+    const chat = allChatsArr.find(c => c.id === chatId);
+    if (chat) chat.members.forEach(m => io.to(`user_${m}`).emit('message_recalled', { chatId, msgId }));
     res.json({ success: true });
 });
 

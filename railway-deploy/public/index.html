@@ -9,6 +9,8 @@
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/contrib/auto-render.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     <style>
         :root {
@@ -116,8 +118,17 @@
         .top-nav-user {
             font-size: 13px; color: var(--text-secondary);
             white-space: nowrap;
-            margin-left: 8px;
+            margin-left: 4px;
         }
+        .top-nav-avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #69b1ff);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; overflow: hidden;
+            flex-shrink: 0; margin-left: 4px;
+            transition: box-shadow 0.2s;
+        }
+        .top-nav-avatar:hover { box-shadow: 0 0 0 3px rgba(22,119,255,0.3); }
 
         /* ===== App Layout ===== */
         .app {
@@ -254,9 +265,14 @@
         }
         .align-left .message-bubble { border-top-left-radius: 6px; }
         .align-right .message-bubble {
-            background: linear-gradient(135deg, #d9f0c3, #c8e6b8);
             border-top-right-radius: 6px;
         }
+        /* 己方消息（无论对齐方式）统一用蓝色主色 */
+        .message-bubble.is-mine {
+            background: linear-gradient(135deg, var(--primary), #69b1ff);
+            color: white;
+        }
+        .message-bubble.is-mine .message-meta { color: rgba(255,255,255,0.7); }
         .align-center .message-bubble { background: #f0f0f0; font-size: 13px; color: var(--text-secondary); }
         .message-bubble:hover { box-shadow: var(--shadow-md); }
         .message-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 5px; display: flex; gap: 8px; align-items: center; }
@@ -482,6 +498,12 @@
         .comment-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
         .comment-author { font-weight: 600; margin-bottom: 5px; font-size: 14px; }
         .comment-time { font-size: 11px; color: var(--text-tertiary); margin-left: 8px; }
+        .comment-reply-quote { font-size: 12px; color: var(--primary); background: var(--primary-light); border-left: 3px solid var(--primary); padding: 3px 8px; margin: 4px 0; border-radius: 0 4px 4px 0; }
+        .comment-actions { display: flex; gap: 14px; margin-top: 6px; }
+        .comment-like-btn, .comment-reply-btn { font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: color 0.2s; }
+        .comment-like-btn:hover, .comment-reply-btn:hover { color: var(--primary); }
+        .comment-like-btn.active { color: var(--danger); }
+        .comment-content { font-size: 14px; line-height: 1.7; }
 
         /* ===== Member List ===== */
         .member-list { max-height: 300px; overflow-y: auto; margin: 10px 0; }
@@ -544,7 +566,38 @@
         .changelog-section ul { padding-left: 20px; }
         .changelog-section li { font-size: 14px; line-height: 1.8; color: var(--text-secondary); }
 
-        /* ===== Profile ===== */
+        /* ===== Profile (B站风格) ===== */
+        .profile-cover {
+            height: 180px;
+            background: linear-gradient(135deg, #1677ff 0%, #667eea 30%, #764ba2 70%, #f093fb 100%);
+            position: relative; border-radius: var(--radius-md) var(--radius-md) 0 0;
+            overflow: hidden;
+        }
+        .profile-cover::after {
+            content: ''; position: absolute; inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.06'%3E%3Ccircle cx='30' cy='30' r='15'/%3E%3C/g%3E%3C/svg%3E");
+        }
+        .profile-info-bar {
+            background: var(--bg-white); padding: 0 28px 20px 28px;
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+            box-shadow: var(--shadow-sm);
+        }
+        .profile-main-row { display: flex; align-items: flex-end; gap: 20px; margin-top: -40px; position: relative; z-index: 1; }
+        .profile-avatar-lg {
+            width: 96px; height: 96px; border-radius: 50%; border: 4px solid white;
+            box-shadow: var(--shadow-md); overflow: hidden; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--primary), #69b1ff);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 36px;
+        }
+        .profile-name-section { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; }
+        .profile-display-name { font-size: 22px; font-weight: 800; color: var(--text-primary); }
+        .profile-username { font-size: 13px; color: var(--text-tertiary); }
+        .profile-stats-row { display: flex; gap: 32px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        .profile-stat { text-align: center; }
+        .profile-stat-num { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+        .profile-stat-label { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
         .profile-section { display: flex; justify-content: center; padding: 16px 0; }
         .profile-avatar-area { display: flex; flex-direction: column; align-items: center; }
         .profile-avatar {
@@ -557,6 +610,53 @@
         }
         .form-group { padding: 16px 0; }
         .form-group label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: var(--text-primary); }
+
+        /* ===== Recall + Toast ===== */
+        .recall-btn {
+            cursor: pointer; margin-left: 6px; font-size: 13px;
+            opacity: 0.5; transition: opacity 0.2s;
+        }
+        .recall-btn:hover { opacity: 1; }
+        .message-bubble.recalled { opacity: 0.5; }
+
+        /* Toast 通知 */
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+        .toast {
+            background: rgba(0,0,0,0.75); color: white;
+            padding: 8px 20px; border-radius: 20px; font-size: 14px;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2s forwards;
+            pointer-events: none;
+        }
+        .toast.success { background: var(--primary); }
+        .toast.error { background: var(--danger); }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-12px); } }
+
+        /* Markdown 预览区域 */
+        .preview-pane {
+            border: 1.5px solid var(--border-color); border-radius: var(--radius-sm);
+            padding: 10px 14px; min-height: 80px; background: var(--bg-main);
+            font-size: 14px; line-height: 1.7; overflow-y: auto;
+        }
+        .preview-pane pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .preview-tabs { display: flex; gap: 0; margin-bottom: 4px; }
+        .preview-tab {
+            padding: 5px 14px; font-size: 13px; cursor: pointer; border: 1.5px solid var(--border-color);
+            background: var(--bg-main); color: var(--text-secondary);
+            transition: var(--transition);
+        }
+        .preview-tab:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+        .preview-tab:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: none; }
+        .preview-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* @ 候选列表 */
+        .mention-dropdown {
+            position: absolute; background: white; border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+            z-index: 100; max-height: 180px; overflow-y: auto; min-width: 160px;
+        }
+        .mention-item { padding: 7px 14px; cursor: pointer; font-size: 14px; }
+        .mention-item:hover { background: var(--primary-light); color: var(--primary); }
 
         /* ===== Responsive ===== */
         @media (max-width: 768px) {
@@ -608,6 +708,20 @@
         if (isNaN(d.getTime())) return isoString;
         return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
     }
+
+    function showToast(msg, type = 'default') {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => el.remove(), 2500);
+    }
     
     async function apiFetch(url, options = {}) {
         const response = await fetch(API_BASE + url, {
@@ -634,6 +748,32 @@
         let withBBCode = parseBBCode(rawText);
         let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false });
         return withMarkdown;
+    }
+    function renderRichTextWithHighlight(rawText) {
+        if (!rawText) return '';
+        let withBBCode = parseBBCode(rawText);
+        let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false });
+        // 延迟执行代码高亮
+        setTimeout(() => {
+            document.querySelectorAll('pre code').forEach(block => {
+                if (!block.dataset.highlighted) {
+                    hljs.highlightElement(block);
+                    block.dataset.highlighted = '1';
+                }
+            });
+        }, 0);
+        return withMarkdown;
+    }
+    // 帖子预览：去除 Markdown/BBCode 标记，保留纯文本
+    function stripMarkdown(text) {
+        if (!text) return '';
+        return text
+            .replace(/\[.*?\](\(.*?\))?/g, '')   // Markdown 链接/图片
+            .replace(/\[\/?\w+\]/g, '')            // BBCode 标签
+            .replace(/[*_`#>~\-=|^]/g, '')         // Markdown 符号
+            .replace(/\$.*?\$/g, '[公式]')         // LaTeX
+            .replace(/\s+/g, ' ')
+            .trim();
     }
     function renderLatexInContainer(container) {
         if (window.renderMathInElement) {
@@ -677,9 +817,9 @@
     
     function handleFileUpload(fileInput) {
         const files = Array.from(fileInput.files);
-        const maxSizeBytes = 500 * 1024 * 1024 * 1024;
+        const maxSizeBytes = 5 * 1024 * 1024;
         for (let file of files) {
-            if (file.size > maxSizeBytes) { alert(`文件 ${file.name} 超过 500GB 限制`); continue; }
+            if (file.size > maxSizeBytes) { alert(`文件 ${file.name} 超过 5MB 限制`); continue; }
             let fileObj = { name: file.name, size: (file.size / (1024 * 1024)).toFixed(2) + ' MB', type: 'file', raw: file };
             if (file.type.startsWith('image/')) {
                 fileObj.type = 'image';
@@ -854,6 +994,7 @@
         }
         await sendMessage(text, attachments, currentAlignment, currentChatId, currentUser);
         inputEl.value = ''; pendingFiles = []; renderPendingFiles();
+        showToast('✓ 消息已发送', 'success');
     }
     
     async function loadChats() { const data = await apiFetch(`/chats/${currentUser}`); allChats = data; return allChats; }
@@ -867,9 +1008,11 @@
         const displayNameMap = {};
         members.forEach(m => { displayNameMap[m.username] = m.displayName; });
         listContainer.innerHTML = messages.map(msg => {
+            const isMine = msg.sender === currentUser;
             const richHtml = renderRichText(msg.text);
             const displayName = displayNameMap[msg.sender] || msg.sender;
-            const attachmentsHtml = (msg.attachments || []).map(att => {
+            const isRecalled = msg.recalled;
+            const attachmentsHtml = isRecalled ? '' : (msg.attachments || []).map(att => {
                 if (att.type === 'image' || (att.type === 'drawing' && att.previewData)) {
                     const imgSrc = att.previewData || att.url;
                     return `<img src="${imgSrc}" class="attachment-img-preview" alt="preview" data-src="${imgSrc}" style="max-width:80px;max-height:80px;border-radius:8px;cursor:pointer;">`;
@@ -878,12 +1021,25 @@
                 }
                 return '';
             }).join('');
-            return `<div class="message-wrapper align-${msg.alignment}"><div class="message-bubble"><div class="message-content">${richHtml}</div>${attachmentsHtml ? `<div class="attachments-area">${attachmentsHtml}</div>` : ''}<div class="message-meta"><span>${escapeHtml(displayName)}</span><span>${formatLocalTime(msg.timestamp)}</span></div></div></div>`;
+            const recallBtn = isMine && !isRecalled ? `<span class="recall-btn" data-msg-id="${msg.id}" data-chat-id="${currentChatId}" title="撤回">↩</span>` : '';
+            return `<div class="message-wrapper align-${msg.alignment}"><div class="message-bubble${isMine ? ' is-mine' : ''}${isRecalled ? ' recalled' : ''}"><div class="message-content">${isRecalled ? '<em style="opacity:0.6">消息已撤回</em>' : richHtml}</div>${attachmentsHtml ? `<div class="attachments-area">${attachmentsHtml}</div>` : ''}<div class="message-meta"><span>${escapeHtml(displayName)}</span><span>${formatLocalTime(msg.timestamp)}</span>${recallBtn}</div></div></div>`;
         }).join('');
         renderLatexInContainer(listContainer);
         listContainer.scrollTop = listContainer.scrollHeight;
         listContainer.querySelectorAll('.attachment-img-preview').forEach(img => { img.removeEventListener('click', handleImageClick); img.addEventListener('click', handleImageClick); });
         listContainer.querySelectorAll('.attachment-item').forEach(el => { el.removeEventListener('click', handleFileDownload); el.addEventListener('click', handleFileDownload); });
+        listContainer.querySelectorAll('.recall-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!confirm('撤回这条消息？（2分钟内有效）')) return;
+                const msgId = btn.getAttribute('data-msg-id');
+                const chatId = btn.getAttribute('data-chat-id');
+                try {
+                    await apiFetch(`/messages/${chatId}/${msgId}`, { method: 'DELETE', body: { operator: currentUser } });
+                    await renderMessageList();
+                } catch (err) { alert('撤回失败：' + err.message); }
+            });
+        });
     }
     
     function handleImageClick(e) { e.stopPropagation(); const src = e.currentTarget.getAttribute('data-src') || e.currentTarget.src; if (src) showImagePreview(src); }
@@ -981,7 +1137,7 @@
     
     // ===== 帖子相关 =====
     async function loadPosts() { return await apiFetch('/posts'); }
-    async function createPost(title, content) { return await apiFetch('/posts', { method: 'POST', body: { title, content, author: currentUser } }); }
+    async function createPost(title, content, attachments = []) { return await apiFetch('/posts', { method: 'POST', body: { title, content, author: currentUser, attachments } }); }
     async function getPostDetail(postId) { return await apiFetch(`/posts/${postId}`); }
     async function likePost(postId) { return await apiFetch(`/posts/${postId}/like`, { method: 'POST', body: { username: currentUser } }); }
     async function favoritePost(postId) { return await apiFetch(`/posts/${postId}/favorite`, { method: 'POST', body: { username: currentUser } }); }
@@ -994,8 +1150,8 @@
         const posts = await loadPosts();
         container.innerHTML = posts.map(post => `
             <div class="post-card" data-id="${post.id}">
-                <div class="post-title">${escapeHtml(post.title)}</div>
-                <div class="post-preview">${escapeHtml(post.content.substring(0, 100))}...</div>
+                <div class="post-title">${escapeHtml(post.title)}${(post.attachments && post.attachments.length) ? ' <i class="fas fa-paperclip" style="color:var(--text-tertiary);"></i>' : ''}</div>
+                <div class="post-preview">${escapeHtml(stripMarkdown(post.content).substring(0, 100))}${post.content.length > 100 ? '...' : ''}</div>
                 <div class="post-meta">
                     <span class="post-author"><i class="fas fa-user"></i> ${escapeHtml(post.authorNickname)}</span>
                     <span class="post-stats"><i class="fas fa-eye"></i> ${post.views || 0} <i class="fas fa-heart"></i> ${post.likeCount} <i class="fas fa-star"></i> ${post.favoriteCount} <i class="fas fa-comment"></i> ${post.commentCount}</span>
@@ -1037,7 +1193,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1086,7 +1242,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1119,52 +1275,125 @@
     
     // ===== 发布帖子页面 =====
     function renderCreatePostPage() {
+        pendingFiles = [];
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
             <div class="page-container">
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">发布新帖</span></div>
                 <div class="page-body">
-                    <div class="modal-field"><label>标题</label><input id="postTitle" class="inline-input"></div>
-                    <div class="modal-field"><label>内容（支持 Markdown、LaTeX、BBCode、绘图等）</label><textarea id="postContent" class="text-input" rows="12" placeholder="内容..."></textarea></div>
+                    <div class="modal-field"><label>标题</label><input id="postTitle" class="inline-input" placeholder="帖子标题..."></div>
+                    <div class="modal-field">
+                        <label>内容（支持 Markdown、LaTeX、BBCode）</label>
+                        <div class="toolbar" style="margin-bottom:8px;">
+                            <label class="tool-btn" title="上传文件"><i class="fas fa-paperclip"></i><input type="file" multiple id="postFileInput" style="display:none"></label>
+                        </div>
+                        <div id="pendingFilesContainer" class="file-list"></div>
+                        <div class="preview-tabs">
+                            <span class="preview-tab active" id="editorTab">编辑</span>
+                            <span class="preview-tab" id="previewTab">预览</span>
+                        </div>
+                        <textarea id="postContent" class="text-input" rows="14" placeholder="内容... 支持 **Markdown** $LaTeX$ [b]BBCode[/b]"></textarea>
+                        <div id="postPreviewPane" class="preview-pane" style="display:none;min-height:200px;"></div>
+                    </div>
                     <div class="modal-actions">
                         <button id="cancelBtn" class="modal-btn-cancel">取消</button>
-                        <button id="submitBtn" class="modal-btn-confirm">发布</button>
+                        <button id="submitBtn" class="modal-btn-confirm">发布 (Ctrl+Enter)</button>
                     </div>
-                    <p style="font-size:12px;color:#888;margin-top:8px;">💡 提示：你可以使用绘图工具生成图片后，将图片链接或base64嵌入内容。</p>
                 </div>
             </div>
         `;
         document.getElementById('backBtn').addEventListener('click', goBack);
         document.getElementById('cancelBtn').addEventListener('click', goBack);
-        document.getElementById('submitBtn').addEventListener('click', async () => {
+        // 文件上传
+        const postFileInput = document.getElementById('postFileInput');
+        const postFileLabel = document.querySelector('#postFileInput').parentElement;
+        if (postFileLabel && postFileInput) {
+            postFileLabel.addEventListener('click', e => { e.preventDefault(); postFileInput.click(); });
+            postFileInput.addEventListener('change', e => handleFileUpload(e.target));
+        }
+        document.getElementById('editorTab').addEventListener('click', () => {
+            document.getElementById('postContent').style.display = '';
+            document.getElementById('postPreviewPane').style.display = 'none';
+            document.getElementById('editorTab').classList.add('active');
+            document.getElementById('previewTab').classList.remove('active');
+        });
+        document.getElementById('previewTab').addEventListener('click', () => {
+            const content = document.getElementById('postContent').value;
+            const pane = document.getElementById('postPreviewPane');
+            pane.innerHTML = renderRichTextWithHighlight(content) || '<em style="color:#aaa">（空）</em>';
+            renderLatexInContainer(pane);
+            document.getElementById('postContent').style.display = 'none';
+            pane.style.display = '';
+            document.getElementById('previewTab').classList.add('active');
+            document.getElementById('editorTab').classList.remove('active');
+        });
+        const submit = async () => {
             const title = document.getElementById('postTitle').value.trim();
             const content = document.getElementById('postContent').value.trim();
             if (!title || !content) return alert('标题和内容不能为空');
-            await createPost(title, content);
-            alert('发布成功');
+            const attachments = pendingFiles.map(f => ({
+                type: f.type, name: f.name,
+                url: f.preview || f.previewData || '', size: f.size
+            }));
+            await createPost(title, content, attachments);
+            pendingFiles = [];
+            showToast('✓ 帖子发布成功！', 'success');
             goBack();
+        };
+        document.getElementById('submitBtn').addEventListener('click', submit);
+        document.getElementById('postContent').addEventListener('keydown', e => {
+            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); submit(); }
         });
     }
     
     // ===== 帖子详情页面 =====
+    function renderCommentHtml(comments) {
+        return comments.map(c => {
+            const replyInfo = c.replyTo ? `<div class="comment-reply-quote">↩ 回复 @${escapeHtml(c.replyTo)}</div>` : '';
+            const attachHtml = (c.attachments || []).map(att => {
+                if (att.url && att.type === 'image') return `<img src="${att.url}" class="attachment-img-preview" data-src="${att.url}" style="max-width:80px;cursor:pointer;">`;
+                if (att.url) return `<a href="${att.url}" class="attachment-item" target="_blank"><i class="fas fa-file"></i> ${escapeHtml(att.name)}</a>`;
+                return '';
+            }).join('');
+            const likeCount = c.likes ? c.likes.length : 0;
+            const likedByMe = c.likes && c.likes.includes(currentUser);
+            return `<div class="comment-item" id="comment-${c.id}">
+                <div class="comment-author">${escapeHtml(c.authorNickname)}<span class="comment-time">${new Date(c.createdAt).toLocaleString()}</span></div>
+                ${replyInfo}
+                <div class="comment-content">${renderRichTextWithHighlight(c.content)}</div>
+                ${attachHtml}
+                <div class="comment-actions">
+                    <span class="comment-like-btn ${likedByMe ? 'active' : ''}" data-comment-id="${c.id}"><i class="fas fa-heart"></i> ${likeCount}</span>
+                    <span class="comment-reply-btn" data-username="${escapeHtml(c.authorNickname)}" data-comment-id="${c.id}">↩ 回复</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
     async function renderPostDetailPage(postId) {
+        pendingFiles = [];
         const post = await getPostDetail(postId);
         const liked = post.likes?.includes(currentUser);
         const favorited = post.favorites?.includes(currentUser);
+        const canDelete = post.author === currentUser || isAdmin;
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
             <div class="page-container">
-                <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">帖子详情</span></div>
+                <div class="page-header">
+                    <button id="backBtn" class="page-back-btn">← 返回</button>
+                    <span class="page-title">帖子详情</span>
+                    ${canDelete ? `<button id="deletePostBtn" class="page-back-btn" style="margin-left:auto;color:var(--danger);">🗑 删除</button>` : ''}
+                </div>
                 <div class="page-body">
                     <h2 style="margin-bottom:10px; font-size:22px; font-weight:700;">${escapeHtml(post.title)}</h2>
                     <div class="post-meta" style="margin-bottom:12px;">
@@ -1176,20 +1405,40 @@
                         <button id="likeBtn" class="${liked ? 'active' : ''}"><i class="fas fa-heart"></i> 点赞 ${post.likeCount}</button>
                         <button id="favBtn" class="${favorited ? 'active' : ''}"><i class="fas fa-star"></i> 收藏 ${post.favoriteCount}</button>
                     </div>
-                    <div class="post-detail-content">${renderRichText(post.content)}</div>
+                    <div class="post-detail-content">${renderRichTextWithHighlight(post.content)}</div>
+                    ${(post.attachments && post.attachments.length) ? `<div class="attachments-area" style="margin-top:12px;">${post.attachments.map(att => att.url ? `<a href="${att.url}" class="attachment-item" target="_blank"><i class="fas fa-file"></i> ${escapeHtml(att.name)}</a>` : (att.type === 'image' ? `<img src="${att.url || att.previewData || ''}" class="attachment-img-preview" data-src="${att.url || att.previewData || ''}" style="max-width:120px;cursor:pointer;">` : '')).join('')}</div>` : ''}
                     <hr>
-                    <h4 style="margin-bottom:8px;">评论 (${post.comments.length})</h4>
-                    <div id="commentsContainer" style="max-height:300px; overflow-y:auto; margin:8px 0;">
-                        ${post.comments.map(c => `<div class="comment-item"><div class="comment-author">${escapeHtml(c.authorNickname)}<span class="comment-time">${new Date(c.createdAt).toLocaleString()}</span></div><div>${renderRichText(c.content)}</div></div>`).join('')}
+                    <h4 id="commentCount" style="margin-bottom:8px;">评论 (${post.comments.length})</h4>
+                    <div id="commentsContainer" style="margin:8px 0;">
+                        ${renderCommentHtml(post.comments)}
                     </div>
-                    <textarea id="commentInput" class="text-input" rows="3" placeholder="发表评论... 支持 Markdown/LaTeX/BBCode"></textarea>
-                    <div class="modal-actions">
-                        <button id="submitCommentBtn" class="modal-btn-confirm">发表评论</button>
+                    <div id="replyIndicator" style="display:none;font-size:13px;color:var(--primary);padding:4px 0;cursor:pointer;"></div>
+                    <div class="toolbar" style="margin-bottom:8px;">
+                        <label class="tool-btn" title="上传文件"><i class="fas fa-paperclip"></i><input type="file" multiple id="commentFileInput" style="display:none"></label>
+                    </div>
+                    <div id="pendingFilesContainer" class="file-list"></div>
+                    <div class="preview-tabs" style="margin-top:12px;">
+                        <span class="preview-tab active" id="commentEditorTab">编辑</span>
+                        <span class="preview-tab" id="commentPreviewTab">预览</span>
+                    </div>
+                    <textarea id="commentInput" class="text-input" rows="3" placeholder="发表评论... 支持 Markdown/LaTeX/BBCode，Ctrl+Enter 发送"></textarea>
+                    <div id="commentPreviewPane" class="preview-pane" style="display:none;"></div>
+                    <div class="modal-actions" style="margin-top:8px;">
+                        <button id="submitCommentBtn" class="modal-btn-confirm">发表评论 (Ctrl+Enter)</button>
                     </div>
                 </div>
             </div>
         `;
         document.getElementById('backBtn').addEventListener('click', goBack);
+        if (canDelete) {
+            document.getElementById('deletePostBtn')?.addEventListener('click', async () => {
+                if (!confirm('确认删除这篇帖子？')) return;
+                await apiFetch(`/posts/${postId}`, { method: 'DELETE', body: { username: currentUser } });
+                showToast('帖子已删除', 'success');
+                goBack();
+            });
+        }
+
         const likeBtn = document.getElementById('likeBtn');
         const favBtn = document.getElementById('favBtn');
         likeBtn.addEventListener('click', async () => {
@@ -1202,15 +1451,87 @@
             favBtn.innerHTML = `<i class="fas fa-star"></i> 收藏 ${result.favoriteCount}`;
             if (result.favorited) favBtn.classList.add('active'); else favBtn.classList.remove('active');
         });
-        document.getElementById('submitCommentBtn').addEventListener('click', async () => {
+
+        // 预览 tabs
+        document.getElementById('commentEditorTab').addEventListener('click', () => {
+            document.getElementById('commentInput').style.display = '';
+            document.getElementById('commentPreviewPane').style.display = 'none';
+            document.getElementById('commentEditorTab').classList.add('active');
+            document.getElementById('commentPreviewTab').classList.remove('active');
+        });
+        document.getElementById('commentPreviewTab').addEventListener('click', () => {
+            const pane = document.getElementById('commentPreviewPane');
+            pane.innerHTML = renderRichTextWithHighlight(document.getElementById('commentInput').value) || '<em style="color:#aaa">（空）</em>';
+            renderLatexInContainer(pane);
+            document.getElementById('commentInput').style.display = 'none';
+            pane.style.display = '';
+            document.getElementById('commentPreviewTab').classList.add('active');
+            document.getElementById('commentEditorTab').classList.remove('active');
+        });
+
+        let replyTo = null;
+        const replyIndicator = document.getElementById('replyIndicator');
+        replyIndicator.addEventListener('click', () => { replyTo = null; replyIndicator.style.display = 'none'; replyIndicator.textContent = ''; });
+
+        // 评论文件上传
+        const commentFileInput = document.getElementById('commentFileInput');
+        const commentFileLabel = document.querySelector('#commentFileInput').parentElement;
+        if (commentFileLabel && commentFileInput) {
+            commentFileLabel.addEventListener('click', e => { e.preventDefault(); commentFileInput.click(); });
+            commentFileInput.addEventListener('change', e => handleFileUpload(e.target));
+        }
+
+        const refreshComments = async () => {
+            const updatedPost = await getPostDetail(postId);
+            document.getElementById('commentsContainer').innerHTML = renderCommentHtml(updatedPost.comments);
+            document.getElementById('commentCount').innerText = `评论 (${updatedPost.comments.length})`;
+            renderLatexInContainer(document.getElementById('commentsContainer'));
+            document.querySelectorAll('#commentsContainer .attachment-img-preview').forEach(img => {
+                img.addEventListener('click', handleImageClick);
+            });
+            bindCommentActions();
+        };
+
+        const submitComment = async () => {
             const content = document.getElementById('commentInput').value.trim();
             if (!content) return alert('评论内容不能为空');
-            await addComment(postId, content);
-            const updatedPost = await getPostDetail(postId);
-            const commentsContainer = document.getElementById('commentsContainer');
-            commentsContainer.innerHTML = updatedPost.comments.map(c => `<div class="comment-item"><div class="comment-author">${escapeHtml(c.authorNickname)}<span class="comment-time">${new Date(c.createdAt).toLocaleString()}</span></div><div>${renderRichText(c.content)}</div></div>`).join('');
+            const attachments = pendingFiles.map(f => ({
+                type: f.type, name: f.name,
+                url: f.preview || f.previewData || '', size: f.size
+            }));
+            await apiFetch(`/posts/${postId}/comments`, { method: 'POST', body: { content, author: currentUser, replyTo, attachments } });
             document.getElementById('commentInput').value = '';
-            document.querySelector('.page-body h4').innerText = `评论 (${updatedPost.comments.length})`;
+            pendingFiles = []; renderPendingFiles();
+            replyTo = null; replyIndicator.style.display = 'none';
+            showToast('✓ 评论已发表', 'success');
+            await refreshComments();
+        };
+        document.getElementById('submitCommentBtn').addEventListener('click', submitComment);
+        document.getElementById('commentInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); submitComment(); }
+        });
+
+        function bindCommentActions() {
+            document.querySelectorAll('.comment-like-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const cid = btn.getAttribute('data-comment-id');
+                    const result = await apiFetch(`/comments/${cid}/like`, { method: 'POST', body: { username: currentUser } });
+                    btn.innerHTML = `<i class="fas fa-heart"></i> ${result.likeCount}`;
+                    if (result.liked) btn.classList.add('active'); else btn.classList.remove('active');
+                });
+            });
+            document.querySelectorAll('.comment-reply-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    replyTo = btn.getAttribute('data-username');
+                    replyIndicator.textContent = `↩ 回复 @${replyTo}（点击取消）`;
+                    replyIndicator.style.display = 'block';
+                    document.getElementById('commentInput').focus();
+                });
+            });
+        }
+        bindCommentActions();
+        document.querySelectorAll('.attachment-img-preview').forEach(img => {
+            img.addEventListener('click', handleImageClick);
         });
         renderLatexInContainer(document.querySelector('.page-body'));
     }
@@ -1227,7 +1548,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">🔧 管理员面板</span></div>
             </div>
@@ -1310,96 +1631,140 @@
     async function renderProfilePage() {
         const userInfo = allUsers.find(u => u.username === currentUser);
         const avatarData = userInfo?.avatar || '';
+        const myPosts = await apiFetch(`/posts`).then(posts => posts.filter(p => p.author === currentUser));
+        const myFavPosts = await apiFetch(`/users/${encodeURIComponent(currentUser)}/favorited-posts`).catch(() => []);
+        const myLikedPosts = await apiFetch(`/users/${encodeURIComponent(currentUser)}/liked-posts`).catch(() => []);
         const root = document.getElementById('root');
+        const renderPostMini = (p) => `<div class="post-card" style="cursor:pointer;" data-id="${p.id}">
+            <div class="post-title">${escapeHtml(p.title)}</div>
+            <div class="post-meta" style="margin-top:4px;"><span><i class="fas fa-heart"></i> ${p.likeCount}</span><span style="margin-left:8px;"><i class="fas fa-comment"></i> ${p.commentCount}</span></div>
+        </div>`;
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
             <div class="page-container">
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">个人主页</span></div>
-                <div class="page-body">
-                    <div class="profile-section">
-                        <div class="profile-avatar-area">
-                            <div id="avatarPreview" class="profile-avatar">
-                                ${avatarData ? `<img src="${avatarData}" alt="头像" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : `<span style="font-size:40px;">${(userInfo?.nickname || currentUser).charAt(0)}</span>`}
+                <div class="page-body" style="padding:0;overflow:hidden;">
+                    <!-- B站风格封面 -->
+                    <div class="profile-cover"></div>
+                    <div class="profile-info-bar">
+                        <div class="profile-main-row">
+                            <div id="avatarPreview" class="profile-avatar-lg">
+                                ${avatarData ? `<img src="${avatarData}" alt="头像" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : `<span>${(userInfo?.nickname || currentUser).charAt(0).toUpperCase()}</span>`}
                             </div>
+                            <div class="profile-name-section">
+                                <span class="profile-display-name">${escapeHtml(userInfo?.nickname || currentUser)}</span>
+                                <span class="profile-username">@${escapeHtml(currentUser)}</span>
+                            </div>
+                        </div>
+                        <div class="profile-stats-row">
+                            <div class="profile-stat"><div class="profile-stat-num">${myPosts.length}</div><div class="profile-stat-label">帖子</div></div>
+                            <div class="profile-stat"><div class="profile-stat-num">${myFavPosts.length}</div><div class="profile-stat-label">收藏</div></div>
+                            <div class="profile-stat"><div class="profile-stat-num">${myLikedPosts.length}</div><div class="profile-stat-label">获赞</div></div>
+                        </div>
+                        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
                             <input type="file" id="avatarInput" accept="image/*" style="display:none;">
-                            <button id="uploadAvatarBtn" class="top-nav-btn" style="margin-top:12px;">📷 更换头像</button>
+                            <button id="uploadAvatarBtn" class="top-nav-btn" style="font-size:12px;">📷 更换头像</button>
                         </div>
                     </div>
-                    <hr>
-                    <div class="form-group">
-                        <label>用户名</label>
-                        <input type="text" value="${escapeHtml(currentUser)}" disabled class="inline-input" style="background:#f5f5f5;">
-                        <span style="font-size:12px;color:#999;">用户名不可修改</span>
+                    <!-- Tabs + 内容 -->
+                    <div style="padding:16px 28px;">
+                        <div class="preview-tabs">
+                            <span class="preview-tab active" id="tabMyPosts">我的帖子 (${myPosts.length})</span>
+                            <span class="preview-tab" id="tabFav">我的收藏 (${myFavPosts.length})</span>
+                            <span class="preview-tab" id="tabLiked">最近点赞 (${myLikedPosts.length})</span>
+                            <span class="preview-tab" id="tabSettings">⚙️ 个人设置</span>
+                        </div>
+                        <div id="profileTabContent" style="margin-top:16px;">
+                            ${myPosts.length ? myPosts.map(renderPostMini).join('') : '<p style="color:#aaa;text-align:center;">暂无帖子</p>'}
+                        </div>
+                        <div id="profileMsg" style="margin-top:8px;text-align:center;font-size:14px;"></div>
                     </div>
-                    <hr>
-                    <div class="form-group">
-                        <label>昵称</label>
-                        <input type="text" id="profileNickname" value="${escapeHtml(userInfo?.nickname || '')}" class="inline-input">
-                        <button id="saveNicknameBtn" class="modal-btn-confirm">保存昵称</button>
-                    </div>
-                    <hr>
-                    <div class="form-group">
-                        <label style="font-weight:700;color:var(--danger);">修改密码</label>
-                        <input type="password" id="oldPassword" placeholder="输入旧密码" class="inline-input">
-                        <input type="password" id="newPassword" placeholder="输入新密码（至少4位）" class="inline-input">
-                        <input type="password" id="confirmPassword" placeholder="确认新密码" class="inline-input">
-                        <button id="changePwdBtn" class="modal-btn-confirm" style="margin-top:8px;">修改密码</button>
-                    </div>
-                    <div id="profileMsg" style="margin-top:12px;text-align:center;font-size:14px;"></div>
                 </div>
             </div>
         `;
-        
         document.getElementById('backBtn').addEventListener('click', goBack);
-        
-        document.getElementById('uploadAvatarBtn')?.addEventListener('click', () => {
-            document.getElementById('avatarInput').click();
-        });
-        
+        document.getElementById('uploadAvatarBtn')?.addEventListener('click', () => document.getElementById('avatarInput').click());
         document.getElementById('avatarInput')?.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
             if (file.size > 1024 * 1024) { showMsg('图片不能超过1MB', 'error'); return; }
             const base64 = await fileToBase64(file);
             try {
-                const result = await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { avatar: base64 } });
-                userInfo.avatar = base64;
-                const preview = document.getElementById('avatarPreview');
-                preview.innerHTML = `<img src="${base64}" alt="头像" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+                await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { avatar: base64 } });
+                if (userInfo) userInfo.avatar = base64;
+                document.getElementById('avatarPreview').innerHTML = `<img src="${base64}" alt="头像" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
                 showMsg('头像已更新');
             } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
         });
-        
-        document.getElementById('saveNicknameBtn')?.addEventListener('click', async () => {
-            const nickname = document.getElementById('profileNickname').value.trim();
-            if (!nickname) { showMsg('昵称不能为空', 'error'); return; }
-            try {
-                await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { nickname } });
-                userInfo.nickname = nickname;
-                showMsg('昵称已更新');
-            } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
+
+        const settingsHtml = `
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" value="${escapeHtml(currentUser)}" disabled class="inline-input" style="background:#f5f5f5;">
+                <span style="font-size:12px;color:#999;">用户名不可修改</span>
+            </div><hr>
+            <div class="form-group">
+                <label>昵称</label>
+                <input type="text" id="profileNickname" value="${escapeHtml(userInfo?.nickname || '')}" class="inline-input">
+                <button id="saveNicknameBtn" class="modal-btn-confirm">保存昵称</button>
+            </div><hr>
+            <div class="form-group">
+                <label style="font-weight:700;color:var(--danger);">修改密码</label>
+                <input type="password" id="oldPassword" placeholder="输入旧密码" class="inline-input">
+                <input type="password" id="newPassword" placeholder="输入新密码（至少4位）" class="inline-input">
+                <input type="password" id="confirmPassword" placeholder="确认新密码" class="inline-input">
+                <button id="changePwdBtn" class="modal-btn-confirm" style="margin-top:8px;">修改密码</button>
+            </div>
+        `;
+
+        function bindSettingsEvents() {
+            document.getElementById('saveNicknameBtn')?.addEventListener('click', async () => {
+                const nickname = document.getElementById('profileNickname').value.trim();
+                if (!nickname) { showMsg('昵称不能为空', 'error'); return; }
+                try {
+                    await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { nickname } });
+                    if (userInfo) userInfo.nickname = nickname;
+                    showMsg('昵称已更新');
+                } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
+            });
+            document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
+                const oldPwd = document.getElementById('oldPassword').value;
+                const newPwd = document.getElementById('newPassword').value.trim();
+                const confirmPwd = document.getElementById('confirmPassword').value.trim();
+                if (!oldPwd) { showMsg('请输入旧密码', 'error'); return; }
+                if (!newPwd || newPwd.length < 4) { showMsg('新密码至少4个字符', 'error'); return; }
+                if (newPwd !== confirmPwd) { showMsg('两次密码输入不一致', 'error'); return; }
+                try {
+                    await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { password: newPwd, oldPassword: oldPwd } });
+                    showMsg('密码已修改');
+                    ['oldPassword','newPassword','confirmPassword'].forEach(id => document.getElementById(id).value = '');
+                } catch (err) { showMsg('修改失败：' + err.message, 'error'); }
+            });
+        }
+
+        function setTab(tabId, html) {
+            ['tabMyPosts','tabFav','tabLiked','tabSettings'].forEach(t => document.getElementById(t).classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById('profileTabContent').innerHTML = html;
+            if (tabId === 'tabSettings') bindSettingsEvents();
+            document.querySelectorAll('#profileTabContent .post-card').forEach(card => {
+                card.addEventListener('click', () => { const id = card.getAttribute('data-id'); if (id) showPostDetailPage(id); });
+            });
+        }
+
+        document.getElementById('tabMyPosts').addEventListener('click', () => setTab('tabMyPosts', myPosts.length ? myPosts.map(renderPostMini).join('') : '<p style="color:#aaa;text-align:center;">暂无帖子</p>'));
+        document.getElementById('tabFav').addEventListener('click', () => setTab('tabFav', myFavPosts.length ? myFavPosts.map(renderPostMini).join('') : '<p style="color:#aaa;text-align:center;">暂无收藏</p>'));
+        document.getElementById('tabLiked').addEventListener('click', () => setTab('tabLiked', myLikedPosts.length ? myLikedPosts.map(renderPostMini).join('') : '<p style="color:#aaa;text-align:center;">暂无点赞</p>'));
+        document.getElementById('tabSettings').addEventListener('click', () => setTab('tabSettings', settingsHtml));
+
+        document.querySelectorAll('#profileTabContent .post-card').forEach(card => {
+            card.addEventListener('click', () => { const id = card.getAttribute('data-id'); if (id) showPostDetailPage(id); });
         });
-        
-        document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
-            const oldPwd = document.getElementById('oldPassword').value;
-            const newPwd = document.getElementById('newPassword').value.trim();
-            const confirmPwd = document.getElementById('confirmPassword').value.trim();
-            if (!oldPwd) { showMsg('请输入旧密码', 'error'); return; }
-            if (!newPwd || newPwd.length < 4) { showMsg('新密码至少4个字符', 'error'); return; }
-            if (newPwd !== confirmPwd) { showMsg('两次密码输入不一致', 'error'); return; }
-            try {
-                await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { password: newPwd, oldPassword: oldPwd } });
-                showMsg('密码已修改');
-                document.getElementById('oldPassword').value = '';
-                document.getElementById('newPassword').value = '';
-                document.getElementById('confirmPassword').value = '';
-            } catch (err) { showMsg('修改失败：' + err.message, 'error'); }
-        });
-        
+
         function showMsg(text, type) {
             const el = document.getElementById('profileMsg');
             if (el) { el.innerText = text; el.style.color = type === 'error' ? 'var(--danger)' : 'var(--primary)'; }
@@ -1435,21 +1800,74 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
             <div class="page-container">
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">更新日志</span></div>
                 <div class="page-body">
-                    <div class="changelog-version">Beta 3.0</div>
+                    <div class="changelog-version">Beta 4.0</div>
+                    <div class="changelog-date">2026年6月28日</div>
+                    <div class="changelog-section">
+                        <h4>🔧 Bug 修复</h4>
+                        <ul>
+                            <li><strong>帖子预览不渲染问题</strong>：帖子列表中的预览内容不再显示 Markdown/BBCode 源码，改为去除标记符后展示纯文本</li>
+                            <li><strong>己方消息不标主色问题</strong>：自己发出的消息气泡统一显示蓝色，不再因对齐方式不同而产生颜色差异</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>✨ 新功能</h4>
+                        <ul>
+                            <li><strong>Markdown 实时预览</strong>：发帖和发评论时新增"编辑 / 预览"切换 Tab，支持实时查看 Markdown 渲染效果</li>
+                            <li><strong>代码语法高亮</strong>：引入 highlight.js，帖子和评论中的代码块自动按编程语言高亮显示</li>
+                            <li><strong>评论点赞</strong>：每条评论下方新增点赞按钮，支持对评论点赞/取消点赞</li>
+                            <li><strong>回复评论</strong>：点击评论的"↩ 回复"按钮，可回复指定评论，引用对方昵称</li>
+                            <li><strong>@ 提及功能</strong>：聊天输入框中输入 @ 会弹出用户候选列表，一键提及好友</li>
+                            <li><strong>消息撤回</strong>：2 分钟内可撤回自己发送的消息（鼠标悬停消息显示撤回按钮），管理员不受时限限制</li>
+                            <li><strong>Ctrl+Enter 快捷发送</strong>：发帖、评论均支持 Ctrl+Enter 快捷发送</li>
+                            <li><strong>发送成功 Toast 提示</strong>：发送消息/帖子/评论后显示动画提示，体验更流畅</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>👤 个人主页升级</h4>
+                        <ul>
+                            <li><strong>右上角头像入口</strong>：顶部导航栏右上角新增圆形头像（有头像则显示头像，否则显示首字母），点击直达个人主页</li>
+                            <li><strong>我的帖子 / 收藏 / 点赞 Tab</strong>：个人主页新增三个 Tab，分别查看发布的帖子、收藏的帖子和点赞过的帖子</li>
+                            <li><strong>个人设置独立为 Tab</strong>：昵称修改、密码修改移入"⚙️ 个人设置"Tab，主页更简洁</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>🛡️ 权限优化</h4>
+                        <ul>
+                            <li><strong>删帖权限</strong>：帖子详情页"删除"按钮仅对帖子作者本人和管理员显示</li>
+                            <li><strong>文件上传大小</strong>：单文件上传上限从 200MB 降至 5MB，防止服务器被大文件卡死</li>
+                        </ul>
+                    </div>
+                    <hr>
+                    <div class="changelog-version" style="margin-top: 40px; font-size: 22px;">Beta 3.1</div>
                     <div class="changelog-date">2026年6月25日</div>
+                    <div class="changelog-section">
+                        <h4>🔧 Bug 修复</h4>
+                        <ul>
+                            <li><strong>已删除用户仍能收消息</strong>：修复管理员删除用户后，其他用户仍可向其发送私聊消息的严重漏洞。删除用户时自动清理私聊数据和消息记录，并实时通知对方</li>
+                            <li><strong>创建私聊防护</strong>：新增用户存在性检查，禁止向不存在的用户发起私聊</li>
+                            <li><strong>发消息防护</strong>：发送消息前验证接收者是否仍存在，防止消息落入无效会话</li>
+                            <li><strong>聊天列表过滤</strong>：敌方已被删除的私聊不再出现在聊天列表中</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>⏰ 时间显示修复</h4>
+                        <ul>
+                            <li><strong>时区修正</strong>：消息时间从 UTC 改为北京时间（UTC+8）显示，之前 22:41 误显示为 02:38 PM 的问题已解决</li>
+                            <li>服务端改用 ISO 时间戳存储，前端按 zh-CN 区域格式化</li>
+                        </ul>
+                    </div>
                     <div class="changelog-section">
                         <h4>🎨 UI 优化</h4>
                         <ul>
-                            <li><strong>蓝色简约风格</strong>：整体 UI 从绿色主题更新为清爽的蓝色调，视觉更现代、专业</li>
-                            <li><strong>统一配色</strong>：主色 #1677ff，导航栏、按钮、选中态、渐变背景全面焕新</li>
-                            <li><strong>品牌升级</strong>：LN Chat 正式迈入 3.0 时代，蓝色更显稳重与专业</li>
+                            <li><strong>蓝色简约风格</strong>：整体 UI 从绿色主题更新为清爽的蓝色调（#1677ff），视觉更现代、专业</li>
+                            <li><strong>品牌升级</strong>：LN Chat 正式迈入 3.1 时代，蓝色更显稳重与专业</li>
                         </ul>
                     </div>
                     <div class="changelog-section">
@@ -1465,7 +1883,7 @@
                         <h4>📋 更新日志优化</h4>
                         <ul>
                             <li>更新日志格式优化，按 Beta 版本归类，增加日期标注</li>
-                            <li>格式更清晰美观，变更内容一目了然</li>
+                            <li>页面标题改为"LN-chat 聊天社区"</li>
                         </ul>
                     </div>
                     <hr>
@@ -1523,6 +1941,9 @@
                 renderChatList();
             });
             socket.on('group_member_added', () => { renderChatList(); });
+            socket.on('message_recalled', ({ chatId, msgId }) => {
+                if (chatId === currentChatId) renderMessageList();
+            });
             socket.on('user_deleted', async ({ username, chatId }) => {
                 alert(`用户「${username}」已被管理员删除，相关私聊已关闭。`);
                 await loadChats();
@@ -1611,18 +2032,20 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 3.0</span>
+                <span class="top-nav-brand">LN Chat 4.0</span>
                 <div class="top-nav-tabs">
                     <div class="top-nav-tab active" data-tab="chats">💬 聊天</div>
                     <div class="top-nav-tab" data-tab="contacts">👥 通讯录</div>
                     <div class="top-nav-tab" data-tab="posts">📝 帖子</div>
                 </div>
                 <div class="top-nav-actions">
-                    <button id="profileBtn" class="top-nav-btn">👤 个人主页</button>
                     ${isAdmin ? '<button id="adminPanelBtn" class="top-nav-btn admin-btn">🛡️ 管理</button>' : ''}
                     <button id="changelogBtn" class="top-nav-btn">📋 更新日志</button>
                     <button id="logoutBtn" class="top-nav-btn danger-btn">退出</button>
-                    <span class="top-nav-user">${escapeHtml(userInfo.nickname)}</span>
+                    <div id="topNavAvatar" class="top-nav-avatar" title="个人主页" style="cursor:pointer;">
+                        ${(allUsers.find(u => u.username === currentUser)?.avatar) ? `<img src="${allUsers.find(u => u.username === currentUser).avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">` : `<span style="font-size:15px;font-weight:700;">${(userInfo.nickname||currentUser).charAt(0).toUpperCase()}</span>`}
+                    </div>
+                    <span class="top-nav-user" style="cursor:pointer;" id="topNavNickname">${escapeHtml(userInfo.nickname)}</span>
                 </div>
             </div>
             <div class="app">
@@ -1656,12 +2079,26 @@
                             <span style="font-size:12px;color:#888;">LaTeX: $...$, Markdown, BBCode</span>
                         </div>
                         <div id="pendingFilesContainer" class="file-list"></div>
+                        <div class="preview-tabs" style="margin-bottom:4px;">
+                            <span class="preview-tab active" id="chatEditorTab">编辑</span>
+                            <span class="preview-tab" id="chatPreviewTab">预览</span>
+                        </div>
                         <textarea id="messageInput" class="text-input" rows="2" placeholder="输入消息... 支持 $LaTeX$ 公式, **Markdown**, [b]BBCode[/b] ..."></textarea>
-                        <div style="display:flex; justify-content:flex-end;"><button id="sendBtn" class="send-btn">发送消息</button></div>
+                        <div id="chatPreviewPane" class="preview-pane" style="display:none;min-height:50px;"></div>
+                        <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;margin-top:8px;">
+                            <span style="font-size:12px;color:#aaa;">Enter/Ctrl+Enter 发送 · Shift+Enter 换行</span>
+                            <button id="sendBtn" class="send-btn">发送</button>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
+        // @ 候选下拉框
+        const mentionDropdown = document.createElement('div');
+        mentionDropdown.className = 'mention-dropdown';
+        mentionDropdown.style.display = 'none';
+        mentionDropdown.style.position = 'fixed';
+        document.body.appendChild(mentionDropdown);
         
         // 顶部标签页切换
         const chatsTab = document.querySelector('.top-nav-tab[data-tab="chats"]');
@@ -1723,7 +2160,8 @@
         if (searchInput) searchInput.addEventListener('input', (e) => renderContactList(e.target.value));
         
         document.getElementById('logoutBtn')?.addEventListener('click', logout);
-        document.getElementById('profileBtn')?.addEventListener('click', () => showPage('profile'));
+        document.getElementById('topNavAvatar')?.addEventListener('click', () => showPage('profile'));
+        document.getElementById('topNavNickname')?.addEventListener('click', () => showPage('profile'));
         document.getElementById('changelogBtn')?.addEventListener('click', () => showPage('changelog'));
         if (isAdmin) document.getElementById('adminPanelBtn')?.addEventListener('click', () => showPage('adminPanel'));
         newGroupBtn.addEventListener('click', createNewGroup);
@@ -1747,8 +2185,60 @@
         const sendBtn = document.getElementById('sendBtn');
         const msgInput = document.getElementById('messageInput');
         if (sendBtn && msgInput) {
-            sendBtn.onclick = () => doSendMessage(msgInput);
-            msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(msgInput); } });
+            // 预览 Tab
+            document.getElementById('chatEditorTab').addEventListener('click', () => {
+                document.getElementById('messageInput').style.display = '';
+                document.getElementById('chatPreviewPane').style.display = 'none';
+                document.getElementById('chatEditorTab').classList.add('active');
+                document.getElementById('chatPreviewTab').classList.remove('active');
+            });
+            document.getElementById('chatPreviewTab').addEventListener('click', () => {
+                const val = msgInput.value;
+                const pane = document.getElementById('chatPreviewPane');
+                pane.innerHTML = renderRichTextWithHighlight(val) || '<em style="color:#aaa">（空）</em>';
+                renderLatexInContainer(pane);
+                document.getElementById('messageInput').style.display = 'none';
+                pane.style.display = '';
+                document.getElementById('chatPreviewTab').classList.add('active');
+                document.getElementById('chatEditorTab').classList.remove('active');
+            });
+            sendBtn.onclick = () => { mentionDropdown.style.display = 'none'; doSendMessage(msgInput); };
+            msgInput.addEventListener('keydown', (e) => {
+                if (mentionDropdown.style.display !== 'none') {
+                    if (e.key === 'Escape') { mentionDropdown.style.display = 'none'; return; }
+                }
+                // Enter 发送，Ctrl+Enter 也发送，Shift+Enter 换行
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); mentionDropdown.style.display = 'none'; doSendMessage(msgInput); }
+                if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); mentionDropdown.style.display = 'none'; doSendMessage(msgInput); }
+            });
+            msgInput.addEventListener('input', () => {
+                const val = msgInput.value;
+                const pos = msgInput.selectionStart;
+                const beforeCursor = val.slice(0, pos);
+                const atIdx = beforeCursor.lastIndexOf('@');
+                if (atIdx !== -1 && (atIdx === 0 || /\s/.test(beforeCursor[atIdx - 1]))) {
+                    const query = beforeCursor.slice(atIdx + 1).toLowerCase();
+                    const matches = allUsers.filter(u => u.username !== currentUser && (u.username.toLowerCase().includes(query) || (u.nickname||'').toLowerCase().includes(query))).slice(0, 6);
+                    if (matches.length) {
+                        const rect = msgInput.getBoundingClientRect();
+                        mentionDropdown.style.left = rect.left + 'px';
+                        mentionDropdown.style.top = (rect.top - Math.min(matches.length, 6) * 36 - 8) + 'px';
+                        mentionDropdown.innerHTML = matches.map(u => `<div class="mention-item" data-username="${escapeHtml(u.username)}">@${escapeHtml(u.nickname || u.username)} <span style="font-size:11px;color:#aaa;">@${escapeHtml(u.username)}</span></div>`).join('');
+                        mentionDropdown.style.display = 'block';
+                        mentionDropdown.querySelectorAll('.mention-item').forEach(item => {
+                            item.addEventListener('mousedown', (e) => {
+                                e.preventDefault();
+                                const username = item.getAttribute('data-username');
+                                const newVal = val.slice(0, atIdx) + `@${username} ` + val.slice(pos);
+                                msgInput.value = newVal;
+                                msgInput.setSelectionRange(atIdx + username.length + 2, atIdx + username.length + 2);
+                                mentionDropdown.style.display = 'none';
+                            });
+                        });
+                    } else mentionDropdown.style.display = 'none';
+                } else mentionDropdown.style.display = 'none';
+            });
+            msgInput.addEventListener('blur', () => setTimeout(() => { mentionDropdown.style.display = 'none'; }, 200));
         }
         const fileInput = document.getElementById('fileInput');
         const fileLabel = document.querySelector('label[title="上传文件"]');
