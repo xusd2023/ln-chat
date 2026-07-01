@@ -42,6 +42,7 @@
             --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        @keyframes blink-anim { 50% { opacity: 0; } }
         body {
             font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, Helvetica, sans-serif;
             background: var(--bg-main);
@@ -658,6 +659,63 @@
         .mention-item { padding: 7px 14px; cursor: pointer; font-size: 14px; }
         .mention-item:hover { background: var(--primary-light); color: var(--primary); }
 
+        /* 消息右键菜单 */
+        .msg-context-menu {
+            position: fixed; background: white; border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+            z-index: 9000; min-width: 140px; padding: 4px 0; overflow: hidden;
+        }
+        .msg-context-menu-item {
+            padding: 8px 16px; cursor: pointer; font-size: 13px; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .msg-context-menu-item:hover { background: var(--primary-light); color: var(--primary); }
+        .msg-context-menu-item.danger:hover { background: var(--danger-light); color: var(--danger); }
+
+        /* 引用消息块 */
+        .quote-block {
+            border-left: 3px solid var(--primary); background: var(--primary-light);
+            padding: 4px 10px; border-radius: 4px; margin-bottom: 4px;
+            font-size: 12px; color: var(--text-secondary); max-height: 60px; overflow: hidden;
+        }
+        .quote-block strong { color: var(--primary); font-size: 11px; }
+
+        /* 转发标识 */
+        .forward-label { font-size: 11px; color: var(--text-tertiary); font-style: italic; margin-bottom: 2px; }
+
+        /* 通知徽章 */
+        .notif-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--danger); color: white; border-radius: 10px;
+            font-size: 10px; font-weight: 700; padding: 0 5px; min-width: 16px; height: 16px;
+            margin-left: 4px; vertical-align: top;
+        }
+
+        /* 通知列表 */
+        .notif-item {
+            padding: 10px 14px; border-bottom: 1px solid var(--border-color);
+            display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+            transition: background var(--transition);
+        }
+        .notif-item:hover { background: var(--primary-light); }
+        .notif-item.unread { background: #f0f7ff; }
+        .notif-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+        .notif-content { flex: 1; min-width: 0; }
+        .notif-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .notif-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .notif-time { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; }
+
+        /* 好友申请卡片 */
+        .friend-request-card {
+            border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+            padding: 12px 14px; margin-bottom: 10px; background: white;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .friend-request-card .fr-actions { margin-left: auto; display: flex; gap: 6px; }
+
+        /* 聊天列表最后消息预览 */
+        .conv-last-msg { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+
         /* ===== Responsive ===== */
         @media (max-width: 768px) {
             .sidebar { width: 100%; height: 100vh; position: absolute; z-index: 10; }
@@ -679,6 +737,26 @@
     const _origin = window.location.origin;
     const API_BASE = _origin + '/api';
     const SOCKET_URL = _origin;
+    
+    // ===== marked.js 配置（开启表格、删除线、任务列表、高亮）=====
+    if (window.marked) {
+        marked.use({
+            gfm: true,
+            breaks: true,
+            mangle: false,
+            headerIds: false,
+            extensions: [{
+                name: 'highlight',
+                level: 'inline',
+                start(src) { return src.indexOf('=='); },
+                tokenizer(src) {
+                    const match = src.match(/^==([\s\S]+?)==/);
+                    if (match) return { type: 'highlight', raw: match[0], text: match[1] };
+                },
+                renderer(token) { return `<mark style="background:#fff3b0;padding:0 2px;border-radius:2px;">${token.text}</mark>`; }
+            }]
+        });
+    }
     
     let currentUser = null;
     let isAdmin = false;
@@ -737,23 +815,52 @@
     }
     
     function parseBBCode(text) {
-        let html = text.replace(/\[b\](.*?)\[\/b\]/g, '<strong>$1</strong>');
-        html = html.replace(/\[i\](.*?)\[\/i\]/g, '<em>$1</em>');
-        html = html.replace(/\[u\](.*?)\[\/u\]/g, '<u>$1</u>');
-        html = html.replace(/\[code\](.*?)\[\/code\]/gs, '<pre><code>$1</code></pre>');
+        if (!text) return '';
+        let html = text;
+        // === 文本格式 ===
+        html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>');
+        html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>');
+        html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u>$1</u>');
+        html = html.replace(/\[s\]([\s\S]*?)\[\/s\]/gi, '<s>$1</s>');
+        html = html.replace(/\[strike\]([\s\S]*?)\[\/strike\]/gi, '<s>$1</s>');
+        html = html.replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color:$1">$2</span>');
+        html = html.replace(/\[size=(\d+)\]([\s\S]*?)\[\/size\]/gi, (m, n, c) => {
+            const sz = [10,12,14,16,20,24,32][Math.min(Math.max(parseInt(n),1),7)-1] || 14;
+            return `<span style="font-size:${sz}px">${c}</span>`;
+        });
+        html = html.replace(/\[font=([^\]]+)\]([\s\S]*?)\[\/font\]/gi, '<span style="font-family:$1">$2</span>');
+        html = html.replace(/\[align=(left|center|right|justify)\]([\s\S]*?)\[\/align\]/gi, '<div style="text-align:$1">$2</div>');
+        html = html.replace(/\[br\]/gi, '<br>');
+        // === 链接与图片 ===
+        html = html.replace(/\[img\]([\s\S]*?)\[\/img\]/gi, '<img src="$1" style="max-width:100%;border-radius:6px;" onerror="this.style.display=\'none\'">');
+        html = html.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">$2</a>');
+        html = html.replace(/\[url\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">$1</a>');
+        html = html.replace(/\[email=([^\]]+)\]([\s\S]*?)\[\/email\]/gi, '<a href="mailto:$1" style="color:var(--primary);">$2</a>');
+        html = html.replace(/\[email\]([\s\S]*?)\[\/email\]/gi, '<a href="mailto:$1" style="color:var(--primary);">$1</a>');
+        // === 引用与代码 ===
+        html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote style="border-left:4px solid var(--primary);background:var(--primary-light);padding:8px 14px;margin:8px 0;border-radius:0 6px 6px 0;color:var(--text-secondary);">$1</blockquote>');
+        html = html.replace(/\[code\]([\s\S]*?)\[\/code\]/gi, '<pre><code>$1</code></pre>');
+        // === 列表 ===
+        html = html.replace(/\[list\]([\s\S]*?)\[\/list\]/gi, (m, inner) => {
+            const items = inner.split(/\[\*\]/).filter(s => s.trim());
+            return '<ul style="padding-left:20px;margin:6px 0;">' + items.map(s => `<li style="margin:3px 0;">${s.trim()}</li>`).join('') + '</ul>';
+        });
+        // === 高级 ===
+        html = html.replace(/\[blink\]([\s\S]*?)\[\/blink\]/gi, '<span style="animation:blink-anim 1s step-start infinite;">$1</span>');
+        html = html.replace(/\[marquee\]([\s\S]*?)\[\/marquee\]/gi, '<marquee>$1</marquee>');
+        html = html.replace(/\[style=([^\]]+)\]([\s\S]*?)\[\/style\]/gi, '<span class="$1">$2</span>');
         return html;
     }
     function renderRichText(rawText) {
         if (!rawText) return '';
         let withBBCode = parseBBCode(rawText);
-        let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false });
+        let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false, gfm: true, breaks: true });
         return withMarkdown;
     }
     function renderRichTextWithHighlight(rawText) {
         if (!rawText) return '';
         let withBBCode = parseBBCode(rawText);
-        let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false });
-        // 延迟执行代码高亮
+        let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false, gfm: true, breaks: true });
         setTimeout(() => {
             document.querySelectorAll('pre code').forEach(block => {
                 if (!block.dataset.highlighted) {
@@ -966,8 +1073,8 @@
     function closeDrawingModal() { if (drawingModalElement) { drawingModalElement.remove(); drawingModalElement = null; } renderPendingFiles(); }
     
     // ===== 聊天核心 =====
-    async function sendMessage(text, attachments, alignment, chatId, sender) {
-        try { return await apiFetch(`/messages/${chatId}`, { method: 'POST', body: { text, attachments, alignment, sender } }); }
+    async function sendMessage(text, attachments, alignment, chatId, sender, quoteMsg) {
+        try { return await apiFetch(`/messages/${chatId}`, { method: 'POST', body: { text, attachments, alignment, sender, quoteMsg } }); }
         catch (err) {
             alert('发送失败：' + err.message);
             // 如果接收者已被删除，刷新聊天列表
@@ -992,24 +1099,36 @@
                 else attachments.push({ type: 'file', name: f.name, size: f.size, isDemo: true });
             }
         }
-        await sendMessage(text, attachments, currentAlignment, currentChatId, currentUser);
+        await sendMessage(text, attachments, currentAlignment, currentChatId, currentUser, currentQuoteMsg);
         inputEl.value = ''; pendingFiles = []; renderPendingFiles();
+        // 清除引用状态
+        currentQuoteMsg = null;
+        const indicator = document.getElementById('quoteIndicator');
+        if (indicator) indicator.remove();
         showToast('✓ 消息已发送', 'success');
     }
     
     async function loadChats() { const data = await apiFetch(`/chats/${currentUser}`); allChats = data; return allChats; }
     async function loadMessages(chatId) { return await apiFetch(`/messages/${chatId}`); }
     
+    let currentQuoteMsg = null; // 当前引用的消息
+    let batchSelectMode = false; // 批量选择模式
+    let batchSelected = new Set(); // 已选消息 ID
+
     async function renderMessageList() {
         const listContainer = document.getElementById('messageList');
         if (!listContainer || !currentChatId) return;
-        const messages = await loadMessages(currentChatId);
+        const messages = await apiFetch(`/messages/${currentChatId}?viewer=${encodeURIComponent(currentUser)}`);
+        // 缓存用于聊天列表预览
+        if (!window._msgPreview) window._msgPreview = {};
+        window._msgPreview[currentChatId] = messages;
+
         const members = await apiFetch(`/chats/${currentChatId}/members`);
         const displayNameMap = {};
         members.forEach(m => { displayNameMap[m.username] = m.displayName; });
         listContainer.innerHTML = messages.map(msg => {
             const isMine = msg.sender === currentUser;
-            const richHtml = renderRichText(msg.text);
+            const richHtml = renderRichText(msg.text || '');
             const displayName = displayNameMap[msg.sender] || msg.sender;
             const isRecalled = msg.recalled;
             const attachmentsHtml = isRecalled ? '' : (msg.attachments || []).map(att => {
@@ -1021,25 +1140,133 @@
                 }
                 return '';
             }).join('');
-            const recallBtn = isMine && !isRecalled ? `<span class="recall-btn" data-msg-id="${msg.id}" data-chat-id="${currentChatId}" title="撤回">↩</span>` : '';
-            return `<div class="message-wrapper align-${msg.alignment}"><div class="message-bubble${isMine ? ' is-mine' : ''}${isRecalled ? ' recalled' : ''}"><div class="message-content">${isRecalled ? '<em style="opacity:0.6">消息已撤回</em>' : richHtml}</div>${attachmentsHtml ? `<div class="attachments-area">${attachmentsHtml}</div>` : ''}<div class="message-meta"><span>${escapeHtml(displayName)}</span><span>${formatLocalTime(msg.timestamp)}</span>${recallBtn}</div></div></div>`;
+            // 引用块
+            const quoteHtml = msg.quoteMsg ? `<div class="quote-block"><strong>↩ ${escapeHtml(msg.quoteMsg.senderName || msg.quoteMsg.sender)}</strong>: ${escapeHtml((msg.quoteMsg.text || '[图片/文件]').substring(0, 60))}</div>` : '';
+            // 转发标识
+            const forwardHtml = msg.forwarded ? `<div class="forward-label">↗ 转发自 ${escapeHtml(msg.forwarded.originalSender)}</div>` : '';
+            return `<div class="message-wrapper align-${msg.alignment||'left'}" data-msg-id="${msg.id}">
+                <div class="message-bubble${isMine ? ' is-mine' : ''}${isRecalled ? ' recalled' : ''}" data-msg-id="${msg.id}">
+                    ${forwardHtml}${quoteHtml}
+                    <div class="message-content">${isRecalled ? '<em style="opacity:0.6">消息已撤回</em>' : richHtml}</div>
+                    ${attachmentsHtml ? `<div class="attachments-area">${attachmentsHtml}</div>` : ''}
+                    <div class="message-meta">
+                        <span>${escapeHtml(displayName)}</span>
+                        <span>${formatLocalTime(msg.timestamp)}</span>
+                    </div>
+                </div>
+            </div>`;
         }).join('');
+
         renderLatexInContainer(listContainer);
         listContainer.scrollTop = listContainer.scrollHeight;
         listContainer.querySelectorAll('.attachment-img-preview').forEach(img => { img.removeEventListener('click', handleImageClick); img.addEventListener('click', handleImageClick); });
         listContainer.querySelectorAll('.attachment-item').forEach(el => { el.removeEventListener('click', handleFileDownload); el.addEventListener('click', handleFileDownload); });
-        listContainer.querySelectorAll('.recall-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (!confirm('撤回这条消息？（2分钟内有效）')) return;
-                const msgId = btn.getAttribute('data-msg-id');
-                const chatId = btn.getAttribute('data-chat-id');
-                try {
-                    await apiFetch(`/messages/${chatId}/${msgId}`, { method: 'DELETE', body: { operator: currentUser } });
+
+        // 右键菜单
+        listContainer.querySelectorAll('.message-bubble').forEach(bubble => {
+            bubble.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const msgId = bubble.getAttribute('data-msg-id');
+                const wrapper = bubble.closest('[data-msg-id]');
+                const allMsgs = Array.from(listContainer.querySelectorAll('[data-msg-id]')).map(w => w.getAttribute('data-msg-id'));
+                const msgObj = messages.find(m => m.id === msgId);
+                if (!msgObj) return;
+                const isMine = msgObj.sender === currentUser;
+                const isRecalled = msgObj.recalled;
+
+                document.querySelectorAll('.msg-context-menu').forEach(m => m.remove());
+                const menu = document.createElement('div');
+                menu.className = 'msg-context-menu';
+                menu.style.cssText = `top:${e.clientY}px;left:${Math.min(e.clientX, window.innerWidth-160)}px;`;
+                menu.innerHTML = `
+                    ${!isRecalled ? `<div class="msg-context-menu-item" data-action="quote">↩ 引用</div>` : ''}
+                    ${!isRecalled ? `<div class="msg-context-menu-item" data-action="forward">↗ 转发</div>` : ''}
+                    <div class="msg-context-menu-item" data-action="hide">🗑️ 删除（仅自己）</div>
+                    ${isMine && !isRecalled ? `<div class="msg-context-menu-item danger" data-action="recall">↩ 撤回（2分钟内）</div>` : ''}
+                    <div class="msg-context-menu-item" data-action="batch">☑️ 批量选择</div>
+                `;
+                document.body.appendChild(menu);
+                const closeMenu = () => menu.remove();
+                setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+
+                menu.querySelector('[data-action="quote"]')?.addEventListener('click', () => {
+                    const displayName = displayNameMap[msgObj.sender] || msgObj.sender;
+                    currentQuoteMsg = { id: msgObj.id, sender: msgObj.sender, senderName: displayName, text: msgObj.text };
+                    const indicator = document.getElementById('quoteIndicator') || (() => {
+                        const el = document.createElement('div');
+                        el.id = 'quoteIndicator';
+                        el.style.cssText = 'background:var(--primary-light);border-left:3px solid var(--primary);padding:6px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;';
+                        document.getElementById('chatInputArea').prepend(el);
+                        return el;
+                    })();
+                    indicator.innerHTML = `<span>↩ 回复 <strong>${escapeHtml(displayName)}</strong>：${escapeHtml((msgObj.text||'[附件]').substring(0,40))}</span><span style="cursor:pointer;padding:0 4px;" id="cancelQuote">✕</span>`;
+                    document.getElementById('cancelQuote')?.addEventListener('click', () => { currentQuoteMsg = null; indicator.remove(); });
+                });
+
+                menu.querySelector('[data-action="forward"]')?.addEventListener('click', async () => {
+                    await loadChats();
+                    const opts = allChats.map((c, i) => `${i+1}. ${c.name || c.members?.find(m=>m!==currentUser) || c.id}`).join('\n');
+                    const input = prompt(`转发到哪个会话？输入序号：\n${opts}`);
+                    const idx = parseInt(input) - 1;
+                    if (isNaN(idx) || idx < 0 || idx >= allChats.length) return;
+                    const targetChat = allChats[idx];
+                    try {
+                        await apiFetch(`/messages/${currentChatId}/${msgId}/forward`, { method: 'POST', body: { targetChatId: targetChat.id, sender: currentUser } });
+                        showToast(`✓ 已转发到「${targetChat.name || '私聊'}」`, 'success');
+                    } catch(err) { showToast('转发失败：' + err.message, 'error'); }
+                });
+
+                menu.querySelector('[data-action="hide"]')?.addEventListener('click', async () => {
+                    await apiFetch(`/messages/${currentChatId}/${msgId}/hide`, { method: 'POST', body: { username: currentUser } });
                     await renderMessageList();
-                } catch (err) { alert('撤回失败：' + err.message); }
+                    showToast('已删除（仅自己不可见）', 'default');
+                });
+
+                menu.querySelector('[data-action="recall"]')?.addEventListener('click', async () => {
+                    if (!confirm('撤回这条消息？')) return;
+                    try {
+                        await apiFetch(`/messages/${currentChatId}/${msgId}`, { method: 'DELETE', body: { operator: currentUser } });
+                        await renderMessageList();
+                    } catch(err) { alert('撤回失败：' + err.message); }
+                });
+
+                menu.querySelector('[data-action="batch"]')?.addEventListener('click', () => {
+                    batchSelectMode = !batchSelectMode;
+                    batchSelected.clear();
+                    renderBatchBar(listContainer);
+                });
             });
         });
+    }
+
+    function renderBatchBar(listContainer) {
+        const existing = document.getElementById('batchBar');
+        if (existing) existing.remove();
+        if (!batchSelectMode) return;
+        const bar = document.createElement('div');
+        bar.id = 'batchBar';
+        bar.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:white;border:1px solid var(--border-color);border-radius:20px;padding:8px 20px;box-shadow:var(--shadow-md);display:flex;gap:12px;align-items:center;z-index:9999;font-size:13px;';
+        bar.innerHTML = `<span id="batchCount">已选 0 条</span><button id="batchDeleteBtn" style="background:var(--danger);color:white;border:none;padding:5px 14px;border-radius:12px;cursor:pointer;">删除</button><button id="batchCancelBtn" style="background:var(--bg-main);border:1px solid var(--border-color);padding:5px 14px;border-radius:12px;cursor:pointer;">取消</button>`;
+        document.body.appendChild(bar);
+        listContainer.querySelectorAll('.message-wrapper').forEach(wrapper => {
+            wrapper.style.cursor = 'pointer';
+            wrapper.addEventListener('click', () => {
+                if (!batchSelectMode) return;
+                const id = wrapper.getAttribute('data-msg-id');
+                if (batchSelected.has(id)) { batchSelected.delete(id); wrapper.style.background = ''; }
+                else { batchSelected.add(id); wrapper.style.background = 'var(--primary-light)'; }
+                document.getElementById('batchCount').textContent = `已选 ${batchSelected.size} 条`;
+            });
+        });
+        document.getElementById('batchDeleteBtn').addEventListener('click', async () => {
+            if (batchSelected.size === 0) return alert('未选择任何消息');
+            if (!confirm(`确定删除 ${batchSelected.size} 条消息（仅自己不可见）？`)) return;
+            await apiFetch(`/messages/${currentChatId}/batch-hide`, { method: 'POST', body: { username: currentUser, msgIds: [...batchSelected] } });
+            batchSelectMode = false; batchSelected.clear(); bar.remove();
+            await renderMessageList();
+            showToast(`✓ 已删除 ${batchSelected.size || '所选'} 条消息`, 'success');
+        });
+        document.getElementById('batchCancelBtn').addEventListener('click', () => { batchSelectMode = false; batchSelected.clear(); bar.remove(); renderMessageList(); });
     }
     
     function handleImageClick(e) { e.stopPropagation(); const src = e.currentTarget.getAttribute('data-src') || e.currentTarget.src; if (src) showImagePreview(src); }
@@ -1060,14 +1287,32 @@
         if (groups.length) {
             html += `<div style="padding:8px 12px; font-size:14px; color:#666;">群聊</div>`;
             groups.forEach(chat => {
-                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="group"><div class="conv-avatar" style="background:var(--primary);">👥</div><div class="conv-info"><div class="conv-name">${escapeHtml(chat.name)}</div><div class="conv-preview">${chat.members.length}人</div></div></div>`;
+                const msgs = (window._msgPreview && window._msgPreview[chat.id]) || [];
+                const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+                const preview = lastMsg ? `${lastMsg.recalled ? '[消息已撤回]' : (lastMsg.text || (lastMsg.attachments && lastMsg.attachments.length ? '[文件]' : ''))}` : `${chat.members.length}人`;
+                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="group">
+                    <div class="conv-avatar" style="background:var(--primary);">👥</div>
+                    <div class="conv-info">
+                        <div class="conv-name">${escapeHtml(chat.name)}</div>
+                        <div class="conv-preview conv-last-msg">${escapeHtml(String(preview).substring(0, 30))}</div>
+                    </div></div>`;
             });
         }
         if (privates.length) {
             html += `<div style="padding:8px 12px; font-size:14px; color:#666;">私聊</div>`;
             privates.forEach(chat => {
                 const other = chat.members.find(m => m !== currentUser);
-                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="private"><div class="conv-avatar" style="background:#576b95;">👤</div><div class="conv-info"><div class="conv-name">${escapeHtml(other)}</div><div class="conv-preview">私聊</div></div></div>`;
+                const otherUser = allUsers.find(u => u.username === other);
+                const msgs = (window._msgPreview && window._msgPreview[chat.id]) || [];
+                const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+                const preview = lastMsg ? `${lastMsg.recalled ? '[消息已撤回]' : (lastMsg.text || (lastMsg.attachments && lastMsg.attachments.length ? '[文件]' : ''))}` : '私聊';
+                const avatarHtml = otherUser && otherUser.avatar ? `<img src="${otherUser.avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">` : `<span style="font-size:16px;font-weight:700;">${escapeHtml(other||'?').charAt(0).toUpperCase()}</span>`;
+                html += `<div class="conv-item ${currentChatId === chat.id ? 'active' : ''}" data-id="${chat.id}" data-type="private">
+                    <div class="conv-avatar" style="background:#576b95;">${avatarHtml}</div>
+                    <div class="conv-info">
+                        <div class="conv-name">${escapeHtml(otherUser ? otherUser.nickname : other)}</div>
+                        <div class="conv-preview conv-last-msg">${escapeHtml(String(preview).substring(0, 30))}</div>
+                    </div></div>`;
             });
         }
         container.innerHTML = html;
@@ -1082,8 +1327,9 @@
                     const titleSpan = document.getElementById('chatTitle');
                     if (titleSpan && chat) {
                         if (chat.type === 'group') titleSpan.innerText = chat.name;
-                        else { const other = chat.members.find(m => m !== currentUser); titleSpan.innerText = `与 ${other} 的私聊`; }
+                        else { const other = chat.members.find(m => m !== currentUser); const otherU = allUsers.find(u => u.username === other); titleSpan.innerText = `与 ${otherU ? otherU.nickname : other} 的私聊`; }
                     }
+                    document.getElementById('chatInputArea').style.display = 'block';
                     document.getElementById('groupSettingsBtn').style.display = 'inline-block';
                 }
             });
@@ -1094,35 +1340,189 @@
         const container = document.getElementById('contactList');
         if (!container) return;
         allUsers = await apiFetch('/users');
+        const myFriends = await apiFetch(`/friends/${currentUser}`);
+        const pendingRequests = await apiFetch(`/friends/requests/${currentUser}`);
         let filteredUsers = allUsers.filter(u => u.username !== currentUser);
         if (searchKeyword) { const kw = searchKeyword.toLowerCase(); filteredUsers = filteredUsers.filter(u => u.username.toLowerCase().includes(kw) || u.nickname.toLowerCase().includes(kw)); }
         filteredUsers.sort((a,b) => a.nickname.localeCompare(b.nickname));
+        const friendUsernames = myFriends.map(f => f.username);
+        
         let html = '';
-        filteredUsers.forEach(user => {
-            html += `<div class="contact-item" data-username="${user.username}" data-nickname="${user.nickname}"><div class="contact-avatar" style="background:#9b59b6;">${user.nickname.charAt(0).toUpperCase()}</div><div class="contact-info"><div class="contact-name">${escapeHtml(user.nickname)}</div><div class="contact-username">@${escapeHtml(user.username)}</div></div></div>`;
-        });
+        // 待处理的好友申请
+        if (pendingRequests.length > 0) {
+            html += `<div style="padding:10px 12px 4px;font-size:13px;font-weight:600;color:var(--primary);">📨 好友申请 (${pendingRequests.length})</div>`;
+            pendingRequests.forEach(req => {
+                html += `<div class="friend-request-card" data-reqid="${req.id}" data-from="${req.from}">
+                    <div class="contact-avatar" style="background:#9b59b6;">${escapeHtml(req.fromNickname||req.from).charAt(0).toUpperCase()}</div>
+                    <div><div style="font-weight:600;font-size:13px;">${escapeHtml(req.fromNickname)}</div><div style="font-size:11px;color:#999;">@${escapeHtml(req.from)}</div></div>
+                    <div class="fr-actions">
+                        <button class="modal-btn-confirm" data-accept="${req.id}" style="padding:4px 10px;font-size:12px;">✓ 接受</button>
+                        <button class="modal-btn-cancel" data-reject="${req.id}" style="padding:4px 10px;font-size:12px;">✗ 拒绝</button>
+                    </div>
+                </div>`;
+            });
+        }
+        // 好友
+        const friendList = filteredUsers.filter(u => friendUsernames.includes(u.username));
+        const otherList = filteredUsers.filter(u => !friendUsernames.includes(u.username));
+        if (friendList.length) {
+            html += `<div style="padding:8px 12px; font-size:13px; color:#666; font-weight:600;">好友 (${friendList.length})</div>`;
+            friendList.forEach(user => {
+                const avatarHtml = user.avatar ? `<img src="${user.avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">` : `<span style="font-size:16px;font-weight:700;">${escapeHtml(user.nickname).charAt(0).toUpperCase()}</span>`;
+                html += `<div class="contact-item" data-username="${user.username}" data-nickname="${escapeHtml(user.nickname)}" data-isfriend="true">
+                    <div class="contact-avatar" style="background:#27ae60;">${avatarHtml}</div>
+                    <div class="contact-info"><div class="contact-name">${escapeHtml(user.nickname)} <span style="font-size:10px;background:#e8f5e9;color:#27ae60;padding:1px 5px;border-radius:4px;">好友</span></div><div class="contact-username">@${escapeHtml(user.username)}</div></div>
+                </div>`;
+            });
+        }
+        if (otherList.length) {
+            html += `<div style="padding:8px 12px; font-size:13px; color:#666; font-weight:600;">全部用户 (${otherList.length})</div>`;
+            otherList.forEach(user => {
+                const avatarHtml = user.avatar ? `<img src="${user.avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">` : `<span style="font-size:16px;font-weight:700;">${escapeHtml(user.nickname).charAt(0).toUpperCase()}</span>`;
+                html += `<div class="contact-item" data-username="${user.username}" data-nickname="${escapeHtml(user.nickname)}" data-isfriend="false">
+                    <div class="contact-avatar" style="background:#9b59b6;">${avatarHtml}</div>
+                    <div class="contact-info"><div class="contact-name">${escapeHtml(user.nickname)}</div><div class="contact-username">@${escapeHtml(user.username)}</div></div>
+                </div>`;
+            });
+        }
         container.innerHTML = html;
+
+        // 好友申请处理
+        container.querySelectorAll('[data-accept]').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const reqId = btn.getAttribute('data-accept');
+                await apiFetch(`/friends/requests/${reqId}`, { method: 'PUT', body: { action: 'accept', username: currentUser } });
+                showToast('✓ 已接受好友申请', 'success');
+                await renderContactList(searchKeyword);
+            });
+        });
+        container.querySelectorAll('[data-reject]').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const reqId = btn.getAttribute('data-reject');
+                await apiFetch(`/friends/requests/${reqId}`, { method: 'PUT', body: { action: 'reject', username: currentUser } });
+                showToast('已拒绝', 'default');
+                await renderContactList(searchKeyword);
+            });
+        });
+
+        // 联系人点击
         document.querySelectorAll('#contactList .contact-item').forEach(el => {
             el.addEventListener('click', async () => {
                 const username = el.getAttribute('data-username');
                 const nickname = el.getAttribute('data-nickname');
-                const result = await apiFetch('/private', { method: 'POST', body: { userA: currentUser, userB: username } });
-                currentChatId = result.id;
-                activeTab = 'chats';
-                document.querySelectorAll('.top-nav-tab').forEach(t => t.classList.remove('active'));
-                document.querySelector('.top-nav-tab[data-tab="chats"]').classList.add('active');
-                document.getElementById('chatList').classList.add('active');
-                document.getElementById('contactList').classList.remove('active');
-                document.getElementById('postList').classList.remove('active');
-                await renderChatList();
-                await renderMessageList();
-                const titleSpan = document.getElementById('chatTitle');
-                if (titleSpan) titleSpan.innerText = `与 ${nickname} 的私聊`;
-                document.getElementById('groupSettingsBtn').style.display = 'inline-block';
+                const isFriend = el.getAttribute('data-isfriend') === 'true';
+                // 显示操作菜单
+                const menu = document.createElement('div');
+                menu.className = 'msg-context-menu';
+                menu.style.cssText = `position:fixed;top:${event.clientY}px;left:${event.clientX}px;z-index:9000;`;
+                menu.innerHTML = `
+                    <div class="msg-context-menu-item" data-action="profile">👤 查看主页</div>
+                    <div class="msg-context-menu-item" data-action="message">💬 发私信</div>
+                    ${!isFriend ? `<div class="msg-context-menu-item" data-action="addfriend">➕ 添加好友</div>` : `<div class="msg-context-menu-item danger" data-action="delfriend">🚫 删除好友</div>`}
+                    <div class="msg-context-menu-item danger" data-action="report">🚩 举报用户</div>
+                `;
+                document.body.appendChild(menu);
+                const closeMenu = () => menu.remove();
+                setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+
+                menu.querySelector('[data-action="profile"]')?.addEventListener('click', () => showPage('userProfile', { username }));
+                menu.querySelector('[data-action="message"]')?.addEventListener('click', async () => {
+                    const result = await apiFetch('/private', { method: 'POST', body: { userA: currentUser, userB: username } });
+                    currentChatId = result.id; switchTab('chats');
+                    await renderChatList(); await renderMessageList();
+                    const titleSpan = document.getElementById('chatTitle');
+                    if (titleSpan) titleSpan.innerText = `与 ${nickname} 的私聊`;
+                    document.getElementById('groupSettingsBtn').style.display = 'inline-block';
+                });
+                menu.querySelector('[data-action="addfriend"]')?.addEventListener('click', async () => {
+                    try {
+                        await apiFetch('/friends/request', { method: 'POST', body: { from: currentUser, to: username } });
+                        showToast(`✓ 好友申请已发送给 ${nickname}`, 'success');
+                    } catch(err) { showToast(err.message || '发送失败', 'error'); }
+                });
+                menu.querySelector('[data-action="delfriend"]')?.addEventListener('click', async () => {
+                    if (!confirm(`确定要删除好友 ${nickname} 吗？`)) return;
+                    await apiFetch(`/friends/${currentUser}/${username}`, { method: 'DELETE' });
+                    showToast('已删除好友', 'default');
+                    await renderContactList(searchKeyword);
+                });
+                menu.querySelector('[data-action="report"]')?.addEventListener('click', async () => {
+                    const reason = prompt(`请输入举报 ${nickname} 的原因：`);
+                    if (!reason || !reason.trim()) return;
+                    await apiFetch('/reports', { method: 'POST', body: { reporter: currentUser, targetUser: username, reason: reason.trim() } });
+                    showToast('✓ 已提交举报，等待管理员处理', 'success');
+                });
             });
         });
     }
     
+    async function renderNotifList() {
+        const container = document.getElementById('notifList');
+        if (!container) return;
+        container.style.display = '';
+        const notifs = await apiFetch(`/notifications/${currentUser}`);
+        // 标记全部已读
+        const unread = notifs.filter(n => !n.read);
+        if (unread.length > 0) {
+            await apiFetch('/notifications/read', { method: 'POST', body: { username: currentUser, notifId: 'all' } });
+            updateNotifBadge(0);
+        }
+        const typeIcon = { post_liked: '❤️', post_favorited: '⭐', post_commented: '💬', comment_replied: '↩️', mentioned: '📢', chat_mentioned: '📢', friend_request: '👤', friend_accepted: '✅' };
+        const typeLabel = { post_liked: '点赞了你的帖子', post_favorited: '收藏了你的帖子', post_commented: '评论了你的帖子', comment_replied: '回复了你的评论', mentioned: '在评论中提到了你', chat_mentioned: '在聊天中提到了你', friend_request: '申请添加你为好友', friend_accepted: '接受了你的好友申请' };
+        if (notifs.length === 0) {
+            container.innerHTML = `<div style="text-align:center;padding:40px;color:#999;font-size:14px;">暂无通知</div>`;
+            return;
+        }
+        container.innerHTML = `<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);">
+            <span style="font-size:13px;font-weight:600;color:var(--text-primary);">全部通知</span>
+        </div>` + notifs.map(n => {
+            const icon = typeIcon[n.type] || '🔔';
+            const label = typeLabel[n.type] || n.type;
+            const timeStr = formatLocalTime(n.createdAt);
+            const byNickname = n.data.byNickname || n.data.fromNickname || '';
+            const postTitle = n.data.postTitle || n.data.chatName || '';
+            return `<div class="notif-item ${n.read ? '' : 'unread'}" data-type="${n.type}" data-postid="${n.data.postId||''}" data-chatid="${n.data.chatId||''}">
+                <div class="notif-icon">${icon}</div>
+                <div class="notif-content">
+                    <div class="notif-title">${escapeHtml(byNickname)} ${label}</div>
+                    <div class="notif-desc">${postTitle ? `「${escapeHtml(postTitle)}」` : ''}${n.data.commentContent ? `：${escapeHtml(n.data.commentContent)}` : ''}</div>
+                </div>
+                <div class="notif-time">${timeStr}</div>
+            </div>`;
+        }).join('');
+        container.querySelectorAll('.notif-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const type = el.getAttribute('data-type');
+                const postId = el.getAttribute('data-postid');
+                const chatId = el.getAttribute('data-chatid');
+                if (postId && ['post_liked','post_favorited','post_commented','comment_replied','mentioned'].includes(type)) {
+                    showPage('postDetail', { postId });
+                } else if (chatId && type === 'chat_mentioned') {
+                    currentChatId = chatId; switchTab('chats'); renderChatList(); renderMessageList();
+                } else if (type === 'friend_request' || type === 'friend_accepted') {
+                    switchTab('contacts'); renderContactList('');
+                }
+            });
+        });
+    }
+
+    function updateNotifBadge(count) {
+        const badge = document.getElementById('notifBadge');
+        if (!badge) return;
+        if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = ''; }
+        else badge.style.display = 'none';
+    }
+
+    async function refreshNotifBadge() {
+        try {
+            const notifs = await apiFetch(`/notifications/${currentUser}`);
+            const unread = notifs.filter(n => !n.read).length;
+            updateNotifBadge(unread);
+        } catch(e) {}
+    }
+
     async function createNewGroup() {
         const name = prompt('请输入群名称');
         if (name && name.trim()) {
@@ -1193,7 +1593,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1201,34 +1601,90 @@
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">会话设置</span></div>
                 <div class="page-body">
                     ${chat.type === 'group' && isCreator ? `<div class="modal-field"><label>群名称：</label><input id="groupNameInput" value="${escapeHtml(chat.name)}" class="inline-input"><button id="saveGroupNameBtn" class="modal-btn-confirm" style="margin-top:8px;">修改群名</button></div><hr>` : ''}
-                    ${chat.type === 'group' ? `<div class="modal-field"><button id="addMemberBtn" class="modal-btn-confirm" style="width:100%;">➕ 添加群成员</button></div><hr>` : ''}
-                    <div class="modal-field"><label>我的本会话昵称：</label><input id="myNicknameInput" value="${escapeHtml(currentNickname)}" placeholder="留空则使用全局昵称" class="inline-input"><button id="saveNicknameBtn" class="modal-btn-confirm" style="margin-top:8px;">设置</button></div>
+                    ${chat.type === 'group' && isCreator ? `<div class="modal-field"><button id="addMemberBtn" class="modal-btn-confirm" style="width:100%;margin-bottom:8px;">➕ 添加群成员</button></div>` : ''}
+                    ${chat.type === 'group' && !isCreator ? `<div class="modal-field"><button id="leaveGroupBtn" class="modal-btn-cancel" style="width:100%;margin-bottom:8px;color:var(--danger);border-color:var(--danger);">🚪 退出群聊</button></div>` : ''}
+                    ${chat.type === 'group' && isCreator ? `<div class="modal-field"><button id="deleteGroupBtn" class="danger-btn-confirm" style="width:100%;margin-bottom:8px;">🗑️ 解散群聊</button></div>` : ''}
+                    <div class="modal-field"><label>我的本会话昵称：</label><input id="myNicknameInput" value="${escapeHtml(currentNickname)}" placeholder="留空则使用全局昵称" class="inline-input"><button id="saveNicknameBtn" class="modal-btn-confirm" style="margin-top:8px;">设置昵称</button></div>
                     <hr>
                     <h4 style="margin-bottom:8px;">成员 (${members.length})</h4>
-                    <div class="member-list">${members.map(m => `<div class="member-item"><span>${escapeHtml(m.displayName)}</span><span class="member-nickname">@${escapeHtml(m.username)}</span></div>`).join('')}</div>
+                    <div class="member-list">${members.map(m => `
+                        <div class="member-item">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <div style="width:32px;height:32px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--primary);font-size:13px;flex-shrink:0;">
+                                    ${m.avatar ? `<img src="${m.avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">` : escapeHtml(m.displayName).charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div style="font-size:14px;font-weight:500;">${escapeHtml(m.displayName)} ${m.isCreator ? '<span style="font-size:11px;color:var(--warning);">👑 群主</span>' : ''}</div>
+                                    <div class="member-nickname">@${escapeHtml(m.username)}</div>
+                                </div>
+                            </div>
+                            ${m.username !== currentUser ? `<button class="top-nav-btn" data-private-user="${m.username}" style="font-size:12px;padding:4px 10px;">💬 私信</button>` : ''}
+                        </div>`).join('')}
+                    </div>
                 </div>
             </div>
         `;
         document.getElementById('backBtn').addEventListener('click', goBack);
+
+        // 群主功能
         if (chat.type === 'group' && isCreator) {
             document.getElementById('saveGroupNameBtn')?.addEventListener('click', async () => {
                 const newName = document.getElementById('groupNameInput').value.trim();
-                if (newName) {
-                    await apiFetch(`/groups/${currentChatId}`, { method: 'PUT', body: { name: newName, operator: currentUser } });
-                    alert('群名修改成功');
-                    await renderChatList();
-                    goBack();
-                } else alert('群名不能为空');
+                if (!newName) return alert('群名不能为空');
+                await apiFetch(`/groups/${currentChatId}`, { method: 'PUT', body: { name: newName, operator: currentUser } });
+                showToast('✓ 群名修改成功', 'success');
+                await renderChatList();
+                goBack();
+            });
+            document.getElementById('addMemberBtn')?.addEventListener('click', () => showPage('addMember', { groupId: currentChatId }));
+            document.getElementById('deleteGroupBtn')?.addEventListener('click', async () => {
+                if (!confirm(`确定要解散群聊「${chat.name}」吗？此操作不可撤销！`)) return;
+                try {
+                    await apiFetch(`/groups/${currentChatId}`, { method: 'DELETE', body: { operator: currentUser } });
+                    showToast('群聊已解散', 'success');
+                    currentChatId = null;
+                    await loadChats();
+                    if (allChats.length > 0) currentChatId = allChats[0].id;
+                    showPage('main');
+                } catch (err) { alert('操作失败：' + err.message); }
             });
         }
-        if (chat.type === 'group') {
-            document.getElementById('addMemberBtn')?.addEventListener('click', () => showPage('addMember', { groupId: currentChatId }));
+
+        // 非群主退出
+        if (chat.type === 'group' && !isCreator) {
+            document.getElementById('leaveGroupBtn')?.addEventListener('click', async () => {
+                if (!confirm(`确定要退出群聊「${chat.name}」吗？`)) return;
+                try {
+                    await apiFetch(`/groups/${currentChatId}/members/${encodeURIComponent(currentUser)}`, { method: 'DELETE' });
+                    showToast('已退出群聊', 'success');
+                    currentChatId = null;
+                    await loadChats();
+                    if (allChats.length > 0) currentChatId = allChats[0].id;
+                    showPage('main');
+                } catch (err) { alert('操作失败：' + err.message); }
+            });
         }
+
         document.getElementById('saveNicknameBtn')?.addEventListener('click', async () => {
             const newNick = document.getElementById('myNicknameInput').value.trim();
             await apiFetch(`/chats/${currentChatId}/nickname`, { method: 'POST', body: { username: currentUser, nickname: newNick } });
-            alert('昵称已更新');
+            showToast('✓ 昵称已更新', 'success');
             goBack();
+        });
+
+        // 私信成员
+        document.querySelectorAll('[data-private-user]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const targetUser = btn.getAttribute('data-private-user');
+                const privChat = await apiFetch('/private', { method: 'POST', body: { userA: currentUser, userB: targetUser } });
+                await loadChats();
+                currentChatId = privChat.id;
+                showPage('main');
+                document.querySelectorAll('.top-nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelector('[data-tab="chats"]')?.classList.add('active');
+                renderChatList();
+                renderMessageList();
+            });
         });
     }
     
@@ -1242,7 +1698,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1279,7 +1735,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1384,7 +1840,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1546,9 +2002,17 @@
         const users = await apiFetch(`/admin/users?operator=${encodeURIComponent(currentUser)}`);
         const posts = await loadPosts();
         const root = document.getElementById('root');
+
+        function fileSizeLabel(bytes) {
+            if (!bytes) return '5MB';
+            if (bytes >= 1024*1024*1024) return (bytes/1024/1024/1024).toFixed(1)+'GB';
+            if (bytes >= 1024*1024) return (bytes/1024/1024).toFixed(0)+'MB';
+            return (bytes/1024).toFixed(0)+'KB';
+        }
+
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">🔧 管理员面板</span></div>
             </div>
@@ -1556,18 +2020,46 @@
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">管理员控制面板</span></div>
                 <div class="page-body">
                     <h3 style="margin-bottom:16px;">👥 用户管理</h3>
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                        <label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="batchSelectAll" style="margin-right:4px;">全选</label>
+                        <button class="top-nav-btn danger-btn" id="batchDeleteBtn" style="font-size:12px;padding:6px 14px;">🗑️ 批量删除（已选 <span id="batchCount">0</span> 人）</button>
+                    </div>
                     <table class="admin-table">
-                        <thead><tr><th>用户名</th><th>昵称</th><th>状态</th><th>角色</th><th>操作</th></tr></thead>
+                        <thead><tr><th style="width:30px;">选</th><th>用户名</th><th>昵称</th><th>角色</th><th>发帖</th><th>私信</th><th>评论</th><th>建群</th><th>文件限制</th><th>操作</th></tr></thead>
                         <tbody id="adminUserTable">
                             ${users.map(u => `
-                                <tr>
+                                <tr id="row-${u.username}">
+                                    <td>${!u.isAdmin ? `<input type="checkbox" class="batch-select-user" data-user="${u.username}">` : ''}</td>
                                     <td><strong>${escapeHtml(u.username)}</strong></td>
                                     <td>${escapeHtml(u.nickname)}</td>
-                                    <td>${u.banned ? '<span class="badge-banned">已封禁</span>' : '<span class="badge-active">正常</span>'}</td>
-                                    <td>${u.isAdmin ? '<span class="badge-admin">管理员</span>' : '用户'}</td>
                                     <td>
-                                        ${!u.isAdmin ? `<button class="top-nav-btn" data-action="ban" data-user="${u.username}" style="font-size:12px;padding:4px 10px;">${u.banned ? '🔓 解封' : '🚫 封禁'}</button>
-                                        <button class="top-nav-btn danger-btn" data-action="delete" data-user="${u.username}" style="font-size:12px;padding:4px 10px;margin-left:4px;">🗑️ 删除</button>` : '<span style="color:#999;font-size:12px;">—</span>'}
+                                        ${u.isAdmin ? '<span class="badge-admin">管理员</span>' : `
+                                        <select class="inline-input" style="padding:4px 8px;width:auto;font-size:12px;" data-perm="role" data-user="${u.username}">
+                                            <option value="user" ${u.role==='user'?'selected':''}>用户</option>
+                                            <option value="banned" ${u.role==='banned'?'selected':''}>封禁（不能登录）</option>
+                                        </select>`}
+                                    </td>
+                                    <td>${u.isAdmin ? '✅' : `<input type="checkbox" data-perm="canPost" data-user="${u.username}" ${u.canPost?'checked':''}>`}</td>
+                                    <td>${u.isAdmin ? '✅' : `<input type="checkbox" data-perm="canMessage" data-user="${u.username}" ${u.canMessage?'checked':''}>`}</td>
+                                    <td>${u.isAdmin ? '✅' : `<input type="checkbox" data-perm="canComment" data-user="${u.username}" ${u.canComment?'checked':''}>`}</td>
+                                    <td>${u.isAdmin ? '✅' : `<input type="checkbox" data-perm="canCreateGroup" data-user="${u.username}" ${u.canCreateGroup?'checked':''}>`}</td>
+                                    <td>${u.isAdmin ? '—' : `
+                                        <select class="inline-input" style="padding:4px 8px;width:auto;font-size:12px;" data-perm="fileSizeLimit" data-user="${u.username}">
+                                            <option value="${50*1024}" ${u.fileSizeLimit===50*1024?'selected':''}>50KB</option>
+                                            <option value="${500*1024}" ${u.fileSizeLimit===500*1024?'selected':''}>500KB</option>
+                                            <option value="${2*1024*1024}" ${u.fileSizeLimit===2*1024*1024?'selected':''}>2MB</option>
+                                            <option value="${5*1024*1024}" ${u.fileSizeLimit===5*1024*1024?'selected':''}>5MB</option>
+                                            <option value="${20*1024*1024}" ${u.fileSizeLimit===20*1024*1024?'selected':''}>20MB</option>
+                                            <option value="${100*1024*1024}" ${u.fileSizeLimit===100*1024*1024?'selected':''}>100MB</option>
+                                            <option value="${500*1024*1024}" ${u.fileSizeLimit===500*1024*1024?'selected':''}>500MB</option>
+                                            <option value="${1024*1024*1024}" ${u.fileSizeLimit===1024*1024*1024?'selected':''}>1GB</option>
+                                        </select>`}
+                                    </td>
+                                    <td>
+                                        ${!u.isAdmin ? `
+                                        <button class="top-nav-btn" data-action="save-perm" data-user="${u.username}" style="font-size:12px;padding:4px 10px;">💾 保存</button>
+                                        <button class="top-nav-btn danger-btn" data-action="delete" data-user="${u.username}" style="font-size:12px;padding:4px 10px;margin-left:4px;">🗑️ 删除</button>
+                                        ` : '<span style="color:#999;font-size:12px;">—</span>'}
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1588,21 +2080,49 @@
                             `).join('')}
                         </tbody>
                     </table>
+                    <hr>
+                    <h3 style="margin-bottom:16px;">🚨 举报管理</h3>
+                    <div id="adminReportsSection">
+                        <table class="admin-table">
+                            <thead><tr><th>举报ID</th><th>举报人</th><th>被举报</th><th>类型</th><th>原因</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+                            <tbody id="adminReportTable">
+                                <tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         `;
         document.getElementById('backBtn').addEventListener('click', goBack);
-        document.querySelectorAll('[data-action="ban"]').forEach(btn => {
+
+        // 保存权限按钮
+        document.querySelectorAll('[data-action="save-perm"]').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const username = btn.getAttribute('data-user');
-                if (!confirm(`确定要${btn.innerText.includes('解封') ? '解封' : '封禁'}用户 ${username} 吗？`)) return;
+                const row = document.getElementById('row-' + username);
+                const getVal = (perm) => {
+                    const el = row.querySelector(`[data-perm="${perm}"]`);
+                    if (!el) return undefined;
+                    if (el.type === 'checkbox') return el.checked;
+                    if (el.tagName === 'SELECT') return el.tagName === 'SELECT' ? (perm === 'fileSizeLimit' ? parseInt(el.value) : el.value) : el.value;
+                    return el.value;
+                };
+                const body = {
+                    operator: currentUser,
+                    role: getVal('role'),
+                    canPost: getVal('canPost'),
+                    canMessage: getVal('canMessage'),
+                    canComment: getVal('canComment'),
+                    canCreateGroup: getVal('canCreateGroup'),
+                    fileSizeLimit: getVal('fileSizeLimit')
+                };
                 try {
-                    const result = await apiFetch(`/admin/ban/${encodeURIComponent(username)}`, { method: 'PUT', body: { operator: currentUser } });
-                    alert(result.message);
-                    showPage('adminPanel');
-                } catch (err) { alert('操作失败：' + err.message); }
+                    await apiFetch(`/admin/users/${encodeURIComponent(username)}/permissions`, { method: 'PUT', body });
+                    showToast(`✓ 已保存 ${username} 的权限`, 'success');
+                } catch (err) { alert('保存失败：' + err.message); }
             });
         });
+
         document.querySelectorAll('[data-action="delete"]').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const username = btn.getAttribute('data-user');
@@ -1625,6 +2145,82 @@
                 } catch (err) { alert('操作失败：' + err.message); }
             });
         });
+
+        // ===== 批量选择 / 批量删除 =====
+        const batchSelectAll = document.getElementById('batchSelectAll');
+        const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+        const batchCountSpan = document.getElementById('batchCount');
+        const updateBatchCount = () => {
+            const checked = document.querySelectorAll('.batch-select-user:checked').length;
+            if (batchCountSpan) batchCountSpan.textContent = checked;
+        };
+        batchSelectAll?.addEventListener('change', () => {
+            document.querySelectorAll('.batch-select-user').forEach(cb => { cb.checked = batchSelectAll.checked; });
+            updateBatchCount();
+        });
+        document.querySelectorAll('.batch-select-user').forEach(cb => {
+            cb.addEventListener('change', updateBatchCount);
+        });
+        batchDeleteBtn?.addEventListener('click', async () => {
+            const checked = [...document.querySelectorAll('.batch-select-user:checked')].map(cb => cb.getAttribute('data-user'));
+            if (checked.length === 0) { alert('请先选择要删除的用户'); return; }
+            if (!confirm(`⚠️ 确定要永久删除 ${checked.length} 个用户吗？\n该操作不可逆！`)) return;
+            try {
+                const result = await apiFetch('/admin/users/batch-delete', { method: 'POST', body: { operator: currentUser, usernames: checked } });
+                alert(result.message || '批量删除完成');
+                showPage('adminPanel');
+            } catch (err) { alert('操作失败：' + err.message); }
+        });
+
+        // ===== 加载举报列表 =====
+        (async () => {
+            try {
+                const reports = await apiFetch(`/admin/reports?operator=${encodeURIComponent(currentUser)}`);
+                const tbody = document.getElementById('adminReportTable');
+                if (!reports || reports.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);">暂无举报</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = reports.map(r => `
+                    <tr id="report-row-${r.id}">
+                        <td style="font-size:11px;color:var(--text-tertiary);">${r.id}</td>
+                        <td>${escapeHtml(r.reporter)}</td>
+                        <td>${escapeHtml(r.targetUser || r.targetPost || '—')}</td>
+                        <td style="font-size:12px;">${r.targetPost ? '帖子' : '用户'}</td>
+                        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.reason)}</td>
+                        <td>${r.status === 'pending' ? '<span style="color:var(--warning);">⏳ 待处理</span>' : '<span style="color:green;">✅ 已处理</span>'}</td>
+                        <td style="font-size:12px;">${formatLocalTime(r.createdAt)}</td>
+                        <td>
+                            ${r.status === 'pending' ? `
+                            <button class="top-nav-btn" data-action="resolve-report" data-id="${r.id}" style="font-size:11px;padding:3px 8px;">✅ 标记已处理</button>
+                            <button class="top-nav-btn danger-btn" data-action="dismiss-report" data-id="${r.id}" style="font-size:11px;padding:3px 8px;">⛔ 忽略</button>
+                            ` : `<span style="font-size:11px;color:var(--text-tertiary);">${formatLocalTime(r.handledAt || Date.now())}</span>`}
+                        </td>
+                    </tr>
+                `).join('');
+
+                tbody.querySelectorAll('[data-action="resolve-report"]').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        await apiFetch(`/admin/reports/${id}`, { method: 'PUT', body: { operator: currentUser, status: 'resolved' } });
+                        showToast('✓ 已标记为已处理', 'success');
+                        btn.closest('tr').querySelector('td:nth-child(6)').innerHTML = '<span style="color:green;">✅ 已处理</span>';
+                        btn.parentElement.innerHTML = `<span style="font-size:11px;color:var(--text-tertiary);">${formatLocalTime(Date.now())}</span>`;
+                    });
+                });
+                tbody.querySelectorAll('[data-action="dismiss-report"]').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        await apiFetch(`/admin/reports/${id}`, { method: 'PUT', body: { operator: currentUser, status: 'resolved' } });
+                        showToast('✓ 已忽略该举报', 'success');
+                        btn.closest('tr').querySelector('td:nth-child(6)').innerHTML = '<span style="color:green;">✅ 已处理</span>';
+                        btn.parentElement.innerHTML = `<span style="font-size:11px;color:var(--text-tertiary);">${formatLocalTime(Date.now())}</span>`;
+                    });
+                });
+            } catch (err) {
+                document.getElementById('adminReportTable').innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;">加载失败</td></tr>';
+            }
+        })();
     }
     
     // ===== 个人主页 =====
@@ -1641,7 +2237,7 @@
         </div>`;
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1800,14 +2396,104 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
             <div class="page-container">
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">更新日志</span></div>
                 <div class="page-body">
-                    <div class="changelog-version">Beta 4.0</div>
+                    <div class="changelog-version">Beta 5.0</div>
+                    <div class="changelog-date">2026年6月29日</div>
+                    <div class="changelog-section">
+                        <h4>💾 数据持久化（重要）</h4>
+                        <ul>
+                            <li><strong>数据不再丢失</strong>：所有用户、帖子、消息、群聊数据写入 JSON 文件（Railway /data 目录），重新部署后数据完整保留</li>
+                            <li>防抖写入（500ms 合并），避免频繁磁盘 I/O</li>
+                            <li>服务启动时打印已加载的用户/帖子/会话数量</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>🔐 细粒度权限系统</h4>
+                        <ul>
+                            <li><strong>管理面板重设计</strong>："封禁"按钮改为全面权限控制表格</li>
+                            <li><strong>角色分级</strong>：用户 / 封禁用户（不能登录） / 管理员</li>
+                            <li><strong>独立权限开关</strong>：发帖 / 私信 / 评论 / 建群聊，每项独立开关</li>
+                            <li><strong>文件大小限制</strong>：可为每个用户单独设置文件上传上限（50KB ~ 1GB）</li>
+                            <li>权限变更即时保存，刷新后生效</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>⌨️ 快捷键调整</h4>
+                        <ul>
+                            <li><strong>聊天输入框</strong>：Enter 换行，Ctrl+Enter 发送（更符合多行输入习惯）</li>
+                            <li>发帖/评论框保持 Ctrl+Enter 发布</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>👥 群聊功能增强</h4>
+                        <ul>
+                            <li><strong>解散群聊</strong>：群主在"⚙️ 设置"中可解散群聊，所有成员实时收到通知</li>
+                            <li><strong>退出群聊</strong>：非群主成员可主动退出群聊</li>
+                            <li><strong>群成员私信</strong>：在群设置中查看成员列表，点击「💬 私信」直接发起私聊</li>
+                            <li>成员列表显示头像、群主标识（👑）</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>📝 BBCode / Markdown 全面增强</h4>
+                        <ul>
+                            <li><strong>新增 BBCode</strong>：[color][size][font][align][br][img][url][email][list][quote][blink][marquee][style]</li>
+                            <li><strong>Markdown GFM</strong>：开启表格、任务列表（- [x]）、删除线（~~）、自动换行</li>
+                            <li><strong>高亮语法</strong>：==文本== 显示为黄色高亮</li>
+                            <li>[quote] 显示蓝色引用块，[img] 支持直接插图，[url] 支持自定义文本链接</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>🗨️ 消息交互增强</h4>
+                        <ul>
+                            <li><strong>引用回复</strong>：右键消息 → 引用，发送消息时附带被引用内容预览</li>
+                            <li><strong>转发消息</strong>：右键消息 → 转发，可将消息转发到群聊或私聊，显示转发来源</li>
+                            <li><strong>删除消息</strong>：右键消息 → 删除（仅自己），消息仅对删除者不可见，其他人仍可查看</li>
+                            <li><strong>批量选择</strong>：右键消息 → 批量选择，可多选消息批量删除（仅自己不可见）</li>
+                            <li><strong>消息撤回</strong>：2 分钟内可撤回自己发送的消息</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>🔔 通知系统</h4>
+                        <ul>
+                            <li><strong>实时通知</strong>：被点赞/评论/收藏、被@提及、收到新消息均有通知提醒</li>
+                            <li><strong>通知中心</strong>：顶部导航新增 🔔 通知 Tab，统一管理所有通知</li>
+                            <li><strong>未读徽章</strong>：导航栏显示未读通知数量，点击可一键标记全部已读</li>
+                            <li>通知支持点击跳转到对应帖子或会话</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>👫 好友系统</h4>
+                        <ul>
+                            <li><strong>好友通讯录</strong>：通讯录中分类显示好友和非好友，支持查看主页/发私信/删除好友</li>
+                            <li><strong>添加好友</strong>：通过搜索用户名查找并发送好友申请</li>
+                            <li><strong>好友申请管理</strong>：在通讯录中查看并处理（接受/拒绝）好友申请</li>
+                            <li><strong>双向好友</strong>：接受后双方互为好友，关系持久保存</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>🚨 举报与管理增强</h4>
+                        <ul>
+                            <li><strong>举报用户</strong>：通讯录右键联系人 → 举报，管理员可在后台查看</li>
+                            <li><strong>举报管理面板</strong>：管理员可查看所有举报（待处理/已处理），支持标记处理或忽略</li>
+                            <li><strong>批量删除用户</strong>：管理员面板支持多选用户一键批量删除</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>🎨 UI/UX 优化</h4>
+                        <ul>
+                            <li><strong>消息右键菜单</strong>：每条消息支持右键弹出操作菜单（引用/转发/删除/撤回/批量选择）</li>
+                            <li><strong>聊天列表预览</strong>：聊天列表每条会话显示最后一条消息预览</li>
+                            <li><strong>链接可点击</strong>：聊天消息中的 URL 自动识别为可点击链接</li>
+                        </ul>
+                    </div>
+                    <hr>
+                    <div class="changelog-version" style="margin-top: 40px; font-size: 22px;">Beta 4.0</div>
                     <div class="changelog-date">2026年6月28日</div>
                     <div class="changelog-section">
                         <h4>🔧 Bug 修复</h4>
@@ -1941,6 +2627,18 @@
                 renderChatList();
             });
             socket.on('group_member_added', () => { renderChatList(); });
+            socket.on('group_member_left', ({ groupId, username: leftUser }) => {
+                if (leftUser === currentUser) { currentChatId = null; loadChats().then(() => renderChatList()); }
+                else if (groupId === currentChatId) renderMessageList();
+            });
+            socket.on('group_deleted', async ({ groupId, name }) => {
+                await loadChats();
+                if (currentChatId === groupId) {
+                    currentChatId = allChats.length > 0 ? allChats[0].id : null;
+                    showToast(`群聊「${name}」已被解散`, 'default');
+                    renderChatList(); renderMessageList();
+                } else renderChatList();
+            });
             socket.on('message_recalled', ({ chatId, msgId }) => {
                 if (chatId === currentChatId) renderMessageList();
             });
@@ -1953,9 +2651,13 @@
                 }
                 renderMainApp({ username: currentUser, nickname: allUsers.find(u => u.username === currentUser)?.nickname || currentUser });
             });
+            socket.on('notification', (notif) => {
+                refreshNotifBadge();
+            });
             await loadChats();
             if (allChats.length > 0) currentChatId = allChats[0].id;
             renderMainApp({ username, nickname: data.nickname });
+            refreshNotifBadge();
         } else { throw new Error(data.message); }
     }
     
@@ -2032,11 +2734,12 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 4.0</span>
+                <span class="top-nav-brand">LN Chat 5.0</span>
                 <div class="top-nav-tabs">
                     <div class="top-nav-tab active" data-tab="chats">💬 聊天</div>
                     <div class="top-nav-tab" data-tab="contacts">👥 通讯录</div>
                     <div class="top-nav-tab" data-tab="posts">📝 帖子</div>
+                    <div class="top-nav-tab" data-tab="notifications" id="notifTab">🔔 通知<span id="notifBadge" class="notif-badge" style="display:none;">0</span></div>
                 </div>
                 <div class="top-nav-actions">
                     ${isAdmin ? '<button id="adminPanelBtn" class="top-nav-btn admin-btn">🛡️ 管理</button>' : ''}
@@ -2056,6 +2759,7 @@
                     <div class="conv-list active" id="chatList"></div>
                     <div class="contact-list" id="contactList"></div>
                     <div class="post-list" id="postList"></div>
+                    <div class="contact-list" id="notifList" style="display:none;"></div>
                     <div style="padding:8px;">
                         <button id="newGroupBtn" class="new-group-btn" style="display:block;">➕ 新建群聊</button>
                         <button id="newPostBtn" class="new-post-btn" style="display:none;">📝 发布新帖</button>
@@ -2086,7 +2790,7 @@
                         <textarea id="messageInput" class="text-input" rows="2" placeholder="输入消息... 支持 $LaTeX$ 公式, **Markdown**, [b]BBCode[/b] ..."></textarea>
                         <div id="chatPreviewPane" class="preview-pane" style="display:none;min-height:50px;"></div>
                         <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;margin-top:8px;">
-                            <span style="font-size:12px;color:#aaa;">Enter/Ctrl+Enter 发送 · Shift+Enter 换行</span>
+                            <span style="font-size:12px;color:#aaa;">Enter 换行 · Ctrl+Enter 发送</span>
                             <button id="sendBtn" class="send-btn">发送</button>
                         </div>
                     </div>
@@ -2104,58 +2808,53 @@
         const chatsTab = document.querySelector('.top-nav-tab[data-tab="chats"]');
         const contactsTab = document.querySelector('.top-nav-tab[data-tab="contacts"]');
         const postsTab = document.querySelector('.top-nav-tab[data-tab="posts"]');
+        const notifTabEl = document.querySelector('.top-nav-tab[data-tab="notifications"]');
         const chatListDiv = document.getElementById('chatList');
         const contactListDiv = document.getElementById('contactList');
         const postListDiv = document.getElementById('postList');
+        const notifListDiv = document.getElementById('notifList');
         const contactSearchBox = document.getElementById('contactSearchBox');
         const newGroupBtn = document.getElementById('newGroupBtn');
         const newPostBtn = document.getElementById('newPostBtn');
         const chatInputArea = document.getElementById('chatInputArea');
         const groupSettingsBtn = document.getElementById('groupSettingsBtn');
-        
-        [chatsTab, contactsTab, postsTab].forEach(t => t.classList.remove('active'));
-        if (activeTab === 'chats') chatsTab.classList.add('active');
-        else if (activeTab === 'contacts') contactsTab.classList.add('active');
-        else postsTab.classList.add('active');
-        
-        if (activeTab === 'chats') {
-            chatListDiv.classList.add('active'); contactListDiv.classList.remove('active'); postListDiv.classList.remove('active');
-            contactSearchBox.style.display = 'none'; newGroupBtn.style.display = 'block'; newPostBtn.style.display = 'none';
-            chatInputArea.style.display = 'block'; groupSettingsBtn.style.display = currentChatId ? 'inline-block' : 'none';
-        } else if (activeTab === 'contacts') {
-            chatListDiv.classList.remove('active'); contactListDiv.classList.add('active'); postListDiv.classList.remove('active');
-            contactSearchBox.style.display = 'block'; newGroupBtn.style.display = 'none'; newPostBtn.style.display = 'none';
+
+        function switchTab(tab) {
+            activeTab = tab;
+            [chatsTab, contactsTab, postsTab, notifTabEl].forEach(t => t && t.classList.remove('active'));
+            [chatListDiv, contactListDiv, postListDiv, notifListDiv].forEach(d => { if(d) { d.classList.remove('active'); d.style.display = 'none'; } });
             chatInputArea.style.display = 'none'; groupSettingsBtn.style.display = 'none';
-        } else {
-            chatListDiv.classList.remove('active'); contactListDiv.classList.remove('active'); postListDiv.classList.add('active');
-            contactSearchBox.style.display = 'none'; newGroupBtn.style.display = 'none'; newPostBtn.style.display = 'block';
-            chatInputArea.style.display = 'none'; groupSettingsBtn.style.display = 'none';
+            contactSearchBox.style.display = 'none'; newGroupBtn.style.display = 'none'; newPostBtn.style.display = 'none';
+            if (tab === 'chats') {
+                chatsTab.classList.add('active');
+                chatListDiv.classList.add('active'); chatListDiv.style.display = '';
+                newGroupBtn.style.display = 'block';
+                chatInputArea.style.display = currentChatId ? 'block' : 'none';
+                groupSettingsBtn.style.display = currentChatId ? 'inline-block' : 'none';
+            } else if (tab === 'contacts') {
+                contactsTab.classList.add('active');
+                contactListDiv.classList.add('active'); contactListDiv.style.display = '';
+                contactSearchBox.style.display = 'block';
+            } else if (tab === 'posts') {
+                postsTab.classList.add('active');
+                postListDiv.classList.add('active'); postListDiv.style.display = '';
+                newPostBtn.style.display = 'block';
+            } else if (tab === 'notifications') {
+                notifTabEl.classList.add('active');
+                notifListDiv.style.display = ''; notifListDiv.classList.add('active');
+                renderNotifList();
+            }
         }
+
+        switchTab(activeTab);
         
-        chatsTab.addEventListener('click', () => {
-            activeTab = 'chats';
-            [chatsTab, contactsTab, postsTab].forEach(t => t.classList.remove('active')); chatsTab.classList.add('active');
-            chatListDiv.classList.add('active'); contactListDiv.classList.remove('active'); postListDiv.classList.remove('active');
-            contactSearchBox.style.display = 'none'; newGroupBtn.style.display = 'block'; newPostBtn.style.display = 'none';
-            chatInputArea.style.display = 'block'; groupSettingsBtn.style.display = currentChatId ? 'inline-block' : 'none';
-        });
-        contactsTab.addEventListener('click', async () => {
-            activeTab = 'contacts';
-            [chatsTab, contactsTab, postsTab].forEach(t => t.classList.remove('active')); contactsTab.classList.add('active');
-            chatListDiv.classList.remove('active'); contactListDiv.classList.add('active'); postListDiv.classList.remove('active');
-            contactSearchBox.style.display = 'block'; newGroupBtn.style.display = 'none'; newPostBtn.style.display = 'none';
-            chatInputArea.style.display = 'none'; groupSettingsBtn.style.display = 'none';
-            await renderContactList('');
-        });
-        postsTab.addEventListener('click', async () => {
-            activeTab = 'posts';
-            [chatsTab, contactsTab, postsTab].forEach(t => t.classList.remove('active')); postsTab.classList.add('active');
-            chatListDiv.classList.remove('active'); contactListDiv.classList.remove('active'); postListDiv.classList.add('active');
-            contactSearchBox.style.display = 'none'; newGroupBtn.style.display = 'none'; newPostBtn.style.display = 'block';
-            chatInputArea.style.display = 'none'; groupSettingsBtn.style.display = 'none';
-            await renderPostList();
-        });
-        
+        switchTab(activeTab);
+
+        chatsTab.addEventListener('click', () => { switchTab('chats'); renderChatList(); if(currentChatId) renderMessageList(); });
+        contactsTab.addEventListener('click', async () => { switchTab('contacts'); await renderContactList(''); });
+        postsTab.addEventListener('click', async () => { switchTab('posts'); await renderPostList(); });
+        notifTabEl?.addEventListener('click', () => { switchTab('notifications'); });
+
         const searchInput = document.getElementById('contactSearchInput');
         if (searchInput) searchInput.addEventListener('input', (e) => renderContactList(e.target.value));
         
@@ -2207,9 +2906,9 @@
                 if (mentionDropdown.style.display !== 'none') {
                     if (e.key === 'Escape') { mentionDropdown.style.display = 'none'; return; }
                 }
-                // Enter 发送，Ctrl+Enter 也发送，Shift+Enter 换行
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); mentionDropdown.style.display = 'none'; doSendMessage(msgInput); }
+                // Ctrl+Enter 发送，Enter 默认换行
                 if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); mentionDropdown.style.display = 'none'; doSendMessage(msgInput); }
+                // 纯 Enter 不阻断（textarea 默认换行行为）
             });
             msgInput.addEventListener('input', () => {
                 const val = msgInput.value;
@@ -2272,6 +2971,18 @@
                     renderChatList();
                 });
                 socket.on('group_member_added', () => renderChatList());
+                socket.on('group_member_left', ({ groupId, username: leftUser }) => {
+                    if (leftUser === storedUser) { currentChatId = null; loadChats().then(() => renderChatList()); }
+                    else renderChatList();
+                });
+                socket.on('group_deleted', async ({ groupId, name }) => {
+                    await loadChats();
+                    if (currentChatId === groupId) {
+                        currentChatId = allChats.length > 0 ? allChats[0].id : null;
+                        showToast(`群聊「${name}」已被解散`, 'default');
+                        renderChatList(); renderMessageList();
+                    } else renderChatList();
+                });
                 socket.on('user_deleted', async ({ username, chatId }) => {
                     alert(`用户「${username}」已被管理员删除，相关私聊已关闭。`);
                     await loadChats();
@@ -2281,9 +2992,11 @@
                     }
                     renderMainApp({ username: storedUser, nickname: userInfo.nickname });
                 });
+                socket.on('notification', (notif) => { refreshNotifBadge(); });
                 await loadChats();
                 if (allChats.length > 0) currentChatId = allChats[0].id;
                 renderMainApp({ username: storedUser, nickname: userInfo.nickname });
+                refreshNotifBadge();
             } catch {
                 localStorage.removeItem('chat_username');
                 renderAuth();
