@@ -559,6 +559,10 @@
         .badge-admin { background: var(--accent); color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
         .badge-active { background: var(--primary); color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 
+        pre { background: #f6f8fa; border-radius: var(--radius-sm); padding: 12px 16px; overflow-x: auto; margin: 8px 0; font-size: 13px; line-height: 1.6; }
+        pre code { background: transparent; padding: 0; font-size: inherit; }
+        code[class*="language-"] { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+        pre code[class*="language-"] { display: block; }
         /* ===== Changelog ===== */
         .changelog-version { font-size: 24px; font-weight: 800; color: var(--primary); margin-bottom: 8px; }
         .changelog-date { font-size: 13px; color: var(--text-tertiary); margin-bottom: 24px; }
@@ -749,7 +753,10 @@
         [data-theme="dark"] .auth-card { background: #1f1f1f; }
         [data-theme="dark"] .inline-input, [data-theme="dark"] .inline-input textarea { background: #2a2a2a; color: var(--text-primary); border-color: var(--border-color); }
         [data-theme="dark"] code { background: #2d2d2d; color: #e6e6e6; }
+        [data-theme="dark"] pre { background: #1e1e1e; }
         [data-theme="dark"] .admin-table tr:hover { background: var(--primary-light); }
+        [data-theme="dark"] .admin-table tr:hover { background: var(--primary-light); }
+        [data-theme="dark"] .profile-cover { filter: brightness(0.7) saturate(0.8); }
 
         /* ===== Responsive ===== */
         @media (max-width: 768px) {
@@ -876,6 +883,7 @@
         html = html.replace(/\[email\]([\s\S]*?)\[\/email\]/gi, '<a href="mailto:$1" style="color:var(--primary);">$1</a>');
         // === 引用与代码 ===
         html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote style="border-left:4px solid var(--primary);background:var(--primary-light);padding:8px 14px;margin:8px 0;border-radius:0 6px 6px 0;color:var(--text-secondary);">$1</blockquote>');
+        html = html.replace(/\[code=(\w+)\]([\s\S]*?)\[\/code\]/gi, '<pre><code class="language-$1">$2</code></pre>');
         html = html.replace(/\[code\]([\s\S]*?)\[\/code\]/gi, '<pre><code>$1</code></pre>');
         // === 列表 ===
         html = html.replace(/\[list\]([\s\S]*?)\[\/list\]/gi, (m, inner) => {
@@ -892,14 +900,25 @@
         if (!rawText) return '';
         let withBBCode = parseBBCode(rawText);
         let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false, gfm: true, breaks: true });
+        // 处理 <code lang="xxx"> 格式
+        withMarkdown = withMarkdown.replace(/<code lang="(\w+)">/gi, '<code class="language-$1">');
         return withMarkdown;
     }
     function renderRichTextWithHighlight(rawText) {
         if (!rawText) return '';
         let withBBCode = parseBBCode(rawText);
         let withMarkdown = marked.parse(withBBCode, { mangle: false, headerIds: false, gfm: true, breaks: true });
+        // 处理 <code lang="xxx"> 格式
+        withMarkdown = withMarkdown.replace(/<code lang="(\w+)">/gi, '<code class="language-$1">');
         setTimeout(() => {
             document.querySelectorAll('pre code').forEach(block => {
+                if (!block.dataset.highlighted) {
+                    hljs.highlightElement(block);
+                    block.dataset.highlighted = '1';
+                }
+            });
+            // 也高亮 inline code
+            document.querySelectorAll('code[class*="language-"]').forEach(block => {
                 if (!block.dataset.highlighted) {
                     hljs.highlightElement(block);
                     block.dataset.highlighted = '1';
@@ -1631,7 +1650,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1742,7 +1761,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1779,7 +1798,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1884,7 +1903,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -2056,7 +2075,7 @@
 
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">🔧 管理员面板</span></div>
             </div>
@@ -2282,7 +2301,7 @@
         </div>`;
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -2290,7 +2309,7 @@
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">个人主页</span></div>
                 <div class="page-body" style="padding:0;overflow:hidden;">
                     <!-- B站风格封面 -->
-                    <div class="profile-cover"></div>
+                    <div class="profile-cover" style="background:${userInfo?.profileBgColor || '#1677ff'};"></div>
                     <div class="profile-info-bar">
                         <div class="profile-main-row">
                             <div id="avatarPreview" class="profile-avatar-lg">
@@ -2361,6 +2380,14 @@
                 <button id="saveBioBtn" class="modal-btn-confirm">保存简介</button>
             </div><hr>
             <div class="form-group">
+                <label>主页背景色</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="color" id="profileBgColor" value="${userInfo?.profileBgColor || '#1677ff'}" style="width:40px;height:40px;border:none;border-radius:8px;cursor:pointer;">
+                    <span style="font-size:13px;color:var(--text-tertiary);">点击色块选择个人主页封面背景色</span>
+                </div>
+                <button id="saveBgColorBtn" class="modal-btn-confirm">保存背景色</button>
+            </div><hr>
+            <div class="form-group">
                 <label style="font-weight:700;color:var(--danger);">修改密码</label>
                 <input type="password" id="oldPassword" placeholder="输入旧密码" class="inline-input">
                 <input type="password" id="newPassword" placeholder="输入新密码（至少4位）" class="inline-input">
@@ -2385,6 +2412,14 @@
                     await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { bio } });
                     if (userInfo) userInfo.bio = bio;
                     showMsg('简介已更新');
+                } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
+            });
+            document.getElementById('saveBgColorBtn')?.addEventListener('click', async () => {
+                const bgColor = document.getElementById('profileBgColor').value;
+                try {
+                    await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { profileBgColor: bgColor } });
+                    if (userInfo) userInfo.profileBgColor = bgColor;
+                    showMsg('背景色已更新');
                 } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
             });
             document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
@@ -2475,7 +2510,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -2508,7 +2543,25 @@
                         </ul>
                     </div>
                     <hr>
-                    <div class="changelog-version">Beta 5.0</div>
+                    <div class="changelog-version" style="margin-top: 40px; font-size: 22px;">Beta 6.1</div>
+                    <div class="changelog-date">2026年7月2日</div>
+                    <div class="changelog-section">
+                        <h4>🎨 个人主页背景色</h4>
+                        <ul>
+                            <li><strong>自定义封面</strong>：个人设置页新增颜色选择器，可自定义主页封面背景色</li>
+                            <li><strong>暗色适配</strong>：暗色模式下封面颜色自动调暗，保持视觉舒适</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>💻 代码语言高亮</h4>
+                        <ul>
+                            <li><strong>BBCode 指定语言</strong>：支持 <code>[code=python]...[/code]</code> 格式，按指定语言高亮</li>
+                            <li><strong>HTML 指定语言</strong>：支持 <code>&lt;code lang="python"&gt;...&lt;/code&gt;</code> 格式，按指定语言高亮</li>
+                            <li><strong>覆盖语言</strong>：Python、JavaScript、Java、C/C++、Go、Rust、SQL、HTML/CSS 等所有 highlight.js 支持的语言</li>
+                        </ul>
+                    </div>
+                    <hr>
+                    <div class="changelog-version" style="margin-top: 40px; font-size: 22px;">Beta 5.0</div>
                     <div class="changelog-date">2026年6月29日</div>
                     <div class="changelog-section">
                         <h4>💾 数据持久化（重要）</h4>
@@ -2654,11 +2707,14 @@
                             <li>服务端改用 ISO 时间戳存储，前端按 zh-CN 区域格式化</li>
                         </ul>
                     </div>
+                    <hr>
+                    <div class="changelog-version" style="margin-top: 40px; font-size: 22px;">Beta 3.0</div>
+                    <div class="changelog-date">2026年6月24日</div>
                     <div class="changelog-section">
                         <h4>🎨 UI 优化</h4>
                         <ul>
                             <li><strong>蓝色简约风格</strong>：整体 UI 从绿色主题更新为清爽的蓝色调（#1677ff），视觉更现代、专业</li>
-                            <li><strong>品牌升级</strong>：LN Chat 正式迈入 3.1 时代，蓝色更显稳重与专业</li>
+                            <li><strong>品牌升级</strong>：LN Chat 正式迈入 3.0 时代，蓝色更显稳重与专业</li>
                         </ul>
                     </div>
                     <div class="changelog-section">
@@ -2839,7 +2895,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 6.0</span>
+                <span class="top-nav-brand">LN Chat 6.1</span>
                 <div class="top-nav-tabs">
                     <div class="top-nav-tab active" data-tab="chats">💬 聊天</div>
                     <div class="top-nav-tab" data-tab="contacts">👥 通讯录</div>

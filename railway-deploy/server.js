@@ -198,7 +198,7 @@ app.post('/api/register', (req, res) => {
     if (db.users.find(u => u.username === username))
         return res.status(400).json({ success: false, message: '用户名已存在' });
     db.users.push({
-        username, nickname, password, bio: '',
+        username, nickname, password, bio: '', profileBgColor: '#1677ff',
         role: 'user', canPost: true, canMessage: true, canComment: true, canCreateGroup: true,
         fileSizeLimit: 5 * 1024 * 1024, banned: false
     });
@@ -215,29 +215,30 @@ app.post('/api/login', (req, res) => {
 });
 
 app.get('/api/users', (req, res) => {
-    res.json(db.users.map(u => ({ username: u.username, nickname: u.nickname, bio: u.bio || '', avatar: u.avatar || '' })));
+    res.json(db.users.map(u => ({ username: u.username, nickname: u.nickname, bio: u.bio || '', avatar: u.avatar || '', profileBgColor: u.profileBgColor || '#1677ff' })));
 });
 
 app.get('/api/users/:username', (req, res) => {
     const user = db.users.find(u => u.username === req.params.username);
     if (!user) return res.status(404).json({ error: '用户不存在' });
-    res.json({ username: user.username, nickname: user.nickname, bio: user.bio || '', avatar: user.avatar || '' });
+    res.json({ username: user.username, nickname: user.nickname, bio: user.bio || '', avatar: user.avatar || '', profileBgColor: user.profileBgColor || '#1677ff' });
 });
 
 app.put('/api/users/:username', (req, res) => {
     const user = db.users.find(u => u.username === req.params.username);
     if (!user) return res.status(404).json({ error: '用户不存在' });
-    const { nickname, bio, avatar, password, oldPassword } = req.body;
+    const { nickname, bio, avatar, password, oldPassword, profileBgColor } = req.body;
     if (nickname !== undefined) user.nickname = nickname;
     if (bio !== undefined) user.bio = bio;
     if (avatar !== undefined) user.avatar = avatar;
+    if (profileBgColor !== undefined) user.profileBgColor = profileBgColor;
     if (password !== undefined) {
         if (user.password !== oldPassword) return res.status(403).json({ error: '旧密码不正确' });
         if (!password || password.length < 4) return res.status(400).json({ error: '新密码至少4个字符' });
         user.password = password;
     }
     saveDB();
-    res.json({ success: true, nickname: user.nickname, bio: user.bio, avatar: user.avatar || '' });
+    res.json({ success: true, nickname: user.nickname, bio: user.bio, avatar: user.avatar || '', profileBgColor: user.profileBgColor || '#1677ff' });
 });
 
 app.get('/api/users/:username/liked-posts', (req, res) => {
