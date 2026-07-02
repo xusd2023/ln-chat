@@ -595,6 +595,7 @@
         .profile-name-section { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; }
         .profile-display-name { font-size: 22px; font-weight: 800; color: var(--text-primary); }
         .profile-username { font-size: 13px; color: var(--text-tertiary); }
+        .profile-bio { font-size: 13px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; max-width: 360px; }
         .profile-stats-row { display: flex; gap: 32px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color); }
         .profile-stat { text-align: center; }
         .profile-stat-num { font-size: 20px; font-weight: 700; color: var(--text-primary); }
@@ -716,6 +717,40 @@
         /* 聊天列表最后消息预览 */
         .conv-last-msg { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 
+        /* ===== Dark Mode ===== */
+        [data-theme="dark"] {
+            --primary: #4096ff;
+            --primary-dark: #1677ff;
+            --primary-light: #111d2c;
+            --accent: #9aa0f5;
+            --accent-dark: #7b82e8;
+            --danger: #ff6b6b;
+            --danger-light: #2a1215;
+            --warning: #ffc53d;
+            --bg-main: #141414;
+            --bg-white: #1f1f1f;
+            --bg-sidebar: #181818;
+            --bg-hover: #2a2a2a;
+            --bg-active: #333333;
+            --text-primary: #e8e8e8;
+            --text-secondary: #b0b0b0;
+            --text-tertiary: #777777;
+            --border-color: #303030;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+            --shadow-md: 0 2px 8px rgba(0,0,0,0.5);
+            --shadow-lg: 0 4px 16px rgba(0,0,0,0.6);
+            --shadow-xl: 0 8px 30px rgba(0,0,0,0.7);
+        }
+        [data-theme="dark"] .message-sent .message-bubble { background: #1677ff; }
+        [data-theme="dark"] .preview-pane pre { background: #2d2d2d; }
+        [data-theme="dark"] .msg-context-menu { background: #2a2a2a; }
+        [data-theme="dark"] .notif-item.unread { background: #111d2c; }
+        [data-theme="dark"] .toast { background: rgba(255,255,255,0.12); }
+        [data-theme="dark"] .auth-card { background: #1f1f1f; }
+        [data-theme="dark"] .inline-input, [data-theme="dark"] .inline-input textarea { background: #2a2a2a; color: var(--text-primary); border-color: var(--border-color); }
+        [data-theme="dark"] code { background: #2d2d2d; color: #e6e6e6; }
+        [data-theme="dark"] .admin-table tr:hover { background: var(--primary-light); }
+
         /* ===== Responsive ===== */
         @media (max-width: 768px) {
             .sidebar { width: 100%; height: 100vh; position: absolute; z-index: 10; }
@@ -733,6 +768,8 @@
 <div id="root"></div>
 
 <script>
+    // 页面加载时立即应用主题（防止闪烁）
+    document.addEventListener('DOMContentLoaded', () => { const t = localStorage.getItem('ln-theme'); if (t === 'dark') document.body.setAttribute('data-theme','dark'); });
     // ===== 配置 =====
     const _origin = window.location.origin;
     const API_BASE = _origin + '/api';
@@ -1429,6 +1466,7 @@
 
                 menu.querySelector('[data-action="profile"]')?.addEventListener('click', () => showPage('userProfile', { username }));
                 menu.querySelector('[data-action="message"]')?.addEventListener('click', async () => {
+                    if (!isFriend) { showToast('⚠️ 请先添加对方为好友才能发私信', 'error'); return; }
                     const result = await apiFetch('/private', { method: 'POST', body: { userA: currentUser, userB: username } });
                     currentChatId = result.id; switchTab('chats');
                     await renderChatList(); await renderMessageList();
@@ -1593,7 +1631,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1672,10 +1710,16 @@
             goBack();
         });
 
-        // 私信成员
+        // 私信成员（需好友关系）
         document.querySelectorAll('[data-private-user]').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const targetUser = btn.getAttribute('data-private-user');
+                // 检查好友关系
+                const myFriends = (await apiFetch(`/friends/${encodeURIComponent(currentUser)}`).catch(() => [])).map(f => f.username);
+                if (!myFriends.includes(targetUser)) {
+                    showToast(`⚠️ 请先添加 ${targetUser} 为好友才能发私信`, 'error');
+                    return;
+                }
                 const privChat = await apiFetch('/private', { method: 'POST', body: { userA: currentUser, userB: targetUser } });
                 await loadChats();
                 currentChatId = privChat.id;
@@ -1698,7 +1742,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1735,7 +1779,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -1840,7 +1884,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -2012,7 +2056,7 @@
 
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">🔧 管理员面板</span></div>
             </div>
@@ -2230,6 +2274,7 @@
         const myPosts = await apiFetch(`/posts`).then(posts => posts.filter(p => p.author === currentUser));
         const myFavPosts = await apiFetch(`/users/${encodeURIComponent(currentUser)}/favorited-posts`).catch(() => []);
         const myLikedPosts = await apiFetch(`/users/${encodeURIComponent(currentUser)}/liked-posts`).catch(() => []);
+        const myNotifs = await apiFetch(`/notifications/${encodeURIComponent(currentUser)}`).catch(() => []);
         const root = document.getElementById('root');
         const renderPostMini = (p) => `<div class="post-card" style="cursor:pointer;" data-id="${p.id}">
             <div class="post-title">${escapeHtml(p.title)}</div>
@@ -2237,7 +2282,7 @@
         </div>`;
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
@@ -2254,6 +2299,7 @@
                             <div class="profile-name-section">
                                 <span class="profile-display-name">${escapeHtml(userInfo?.nickname || currentUser)}</span>
                                 <span class="profile-username">@${escapeHtml(currentUser)}</span>
+                                ${userInfo?.bio ? `<span class="profile-bio">${escapeHtml(userInfo.bio)}</span>` : ''}
                             </div>
                         </div>
                         <div class="profile-stats-row">
@@ -2272,6 +2318,7 @@
                             <span class="preview-tab active" id="tabMyPosts">我的帖子 (${myPosts.length})</span>
                             <span class="preview-tab" id="tabFav">我的收藏 (${myFavPosts.length})</span>
                             <span class="preview-tab" id="tabLiked">最近点赞 (${myLikedPosts.length})</span>
+                            <span class="preview-tab" id="tabActivity">动态 (${myNotifs.length})</span>
                             <span class="preview-tab" id="tabSettings">⚙️ 个人设置</span>
                         </div>
                         <div id="profileTabContent" style="margin-top:16px;">
@@ -2309,6 +2356,11 @@
                 <button id="saveNicknameBtn" class="modal-btn-confirm">保存昵称</button>
             </div><hr>
             <div class="form-group">
+                <label>个人简介</label>
+                <textarea id="profileBio" class="inline-input" rows="3" placeholder="介绍一下自己（最多100字）" style="resize:vertical;line-height:1.5;">${escapeHtml(userInfo?.bio || '')}</textarea>
+                <button id="saveBioBtn" class="modal-btn-confirm">保存简介</button>
+            </div><hr>
+            <div class="form-group">
                 <label style="font-weight:700;color:var(--danger);">修改密码</label>
                 <input type="password" id="oldPassword" placeholder="输入旧密码" class="inline-input">
                 <input type="password" id="newPassword" placeholder="输入新密码（至少4位）" class="inline-input">
@@ -2327,6 +2379,14 @@
                     showMsg('昵称已更新');
                 } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
             });
+            document.getElementById('saveBioBtn')?.addEventListener('click', async () => {
+                const bio = (document.getElementById('profileBio').value || '').slice(0, 100);
+                try {
+                    await apiFetch(`/users/${encodeURIComponent(currentUser)}`, { method: 'PUT', body: { bio } });
+                    if (userInfo) userInfo.bio = bio;
+                    showMsg('简介已更新');
+                } catch (err) { showMsg('更新失败：' + err.message, 'error'); }
+            });
             document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
                 const oldPwd = document.getElementById('oldPassword').value;
                 const newPwd = document.getElementById('newPassword').value.trim();
@@ -2342,19 +2402,38 @@
             });
         }
 
+        // 渲染动态列表
+        const notifTypeLabel = { 'like_post':'点赞了你的帖子', 'comment_post':'评论了你的帖子', 'fav_post':'收藏了你的帖子', 'mention':'在帖子中@了你', 'mention_chat':'在聊天中@了你', 'friend_request':'向你发送好友申请', 'friend_accept':'接受了你的好友申请' };
+        const notifTypeIcon = { 'like_post':'❤️', 'comment_post':'💬', 'fav_post':'⭐', 'mention':'📢', 'mention_chat':'💬', 'friend_request':'👤', 'friend_accept':'👫' };
+        const activityHtml = myNotifs.length ? myNotifs.slice().reverse().map(n => `
+            <div class="notif-item${n.read ? '' : ' unread'}" data-id="${n.id}" data-post="${n.data?.postId||''}">
+                <div class="notif-icon">${notifTypeIcon[n.type] || '🔔'}</div>
+                <div class="notif-content">
+                    <div class="notif-title"><strong>${escapeHtml(n.data?.from||'系统')}</strong> ${notifTypeLabel[n.type]||n.type}</div>
+                    ${n.data?.text ? `<div class="notif-desc">"${escapeHtml(n.data.text.slice(0,60))}"</div>` : ''}
+                    <div class="notif-time" style="margin-top:2px;">${formatLocalTime(n.createdAt)}</div>
+                </div>
+            </div>`).join('') : '<p style="color:#aaa;text-align:center;padding:24px;">暂无动态</p>';
+
         function setTab(tabId, html) {
-            ['tabMyPosts','tabFav','tabLiked','tabSettings'].forEach(t => document.getElementById(t).classList.remove('active'));
+            ['tabMyPosts','tabFav','tabLiked','tabActivity','tabSettings'].forEach(t => document.getElementById(t).classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             document.getElementById('profileTabContent').innerHTML = html;
             if (tabId === 'tabSettings') bindSettingsEvents();
             document.querySelectorAll('#profileTabContent .post-card').forEach(card => {
                 card.addEventListener('click', () => { const id = card.getAttribute('data-id'); if (id) showPostDetailPage(id); });
             });
+            if (tabId === 'tabActivity') {
+                document.querySelectorAll('#profileTabContent .notif-item[data-post]').forEach(item => {
+                    item.addEventListener('click', () => { const pid = item.getAttribute('data-post'); if (pid) showPostDetailPage(pid); });
+                });
+            }
         }
 
         document.getElementById('tabMyPosts').addEventListener('click', () => setTab('tabMyPosts', myPosts.length ? myPosts.map(renderPostMini).join('') : '<p style="color:#aaa;text-align:center;">暂无帖子</p>'));
         document.getElementById('tabFav').addEventListener('click', () => setTab('tabFav', myFavPosts.length ? myFavPosts.map(renderPostMini).join('') : '<p style="color:#aaa;text-align:center;">暂无收藏</p>'));
         document.getElementById('tabLiked').addEventListener('click', () => setTab('tabLiked', myLikedPosts.length ? myLikedPosts.map(renderPostMini).join('') : '<p style="color:#aaa;text-align:center;">暂无点赞</p>'));
+        document.getElementById('tabActivity').addEventListener('click', () => setTab('tabActivity', activityHtml));
         document.getElementById('tabSettings').addEventListener('click', () => setTab('tabSettings', settingsHtml));
 
         document.querySelectorAll('#profileTabContent .post-card').forEach(card => {
@@ -2396,13 +2475,39 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs"></div>
                 <div class="top-nav-actions"><span class="top-nav-user">${escapeHtml(currentUser)}</span></div>
             </div>
             <div class="page-container">
                 <div class="page-header"><button id="backBtn" class="page-back-btn">← 返回</button><span class="page-title">更新日志</span></div>
                 <div class="page-body">
+                    <div class="changelog-version">Beta 6.0</div>
+                    <div class="changelog-date">2026年7月2日</div>
+                    <div class="changelog-section">
+                        <h4>🌙 暗色模式</h4>
+                        <ul>
+                            <li><strong>一键切换</strong>：导航栏右侧新增 🌙 按钮，点击切换暗色/亮色模式</li>
+                            <li><strong>主题持久化</strong>：偏好保存到 localStorage，刷新不丢失</li>
+                            <li><strong>防闪烁</strong>：页面加载前即应用主题，避免亮暗切换时的闪烁</li>
+                            <li><strong>完整覆盖</strong>：侧栏、聊天区、弹窗、右键菜单等所有组件均适配暗色主题</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>👤 个人主页增强</h4>
+                        <ul>
+                            <li><strong>动态 Tab</strong>：新增"动态"页签，展示个人通知历史（被点赞/评论/收藏等）</li>
+                            <li><strong>bio 个人简介</strong>：设置页新增简介编辑框（最多 100 字），显示在个人主页顶部</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-section">
+                        <h4>🔒 好友权限控制</h4>
+                        <ul>
+                            <li><strong>私信需好友</strong>：在通讯录和群成员列表中，非好友无法直接发私信，提示先添加好友</li>
+                            <li><strong>双重入口</strong>：通讯录右键菜单和群设置成员列表的私信按钮均加入好友检查</li>
+                        </ul>
+                    </div>
+                    <hr>
                     <div class="changelog-version">Beta 5.0</div>
                     <div class="changelog-date">2026年6月29日</div>
                     <div class="changelog-section">
@@ -2734,7 +2839,7 @@
         const root = document.getElementById('root');
         root.innerHTML = `
             <div class="top-nav">
-                <span class="top-nav-brand">LN Chat 5.0</span>
+                <span class="top-nav-brand">LN Chat 6.0</span>
                 <div class="top-nav-tabs">
                     <div class="top-nav-tab active" data-tab="chats">💬 聊天</div>
                     <div class="top-nav-tab" data-tab="contacts">👥 通讯录</div>
@@ -2743,6 +2848,7 @@
                 </div>
                 <div class="top-nav-actions">
                     ${isAdmin ? '<button id="adminPanelBtn" class="top-nav-btn admin-btn">🛡️ 管理</button>' : ''}
+                    <button id="darkModeBtn" class="top-nav-btn" title="切换暗色/亮色模式" style="font-size:16px;padding:5px 10px;">🌙</button>
                     <button id="changelogBtn" class="top-nav-btn">📋 更新日志</button>
                     <button id="logoutBtn" class="top-nav-btn danger-btn">退出</button>
                     <div id="topNavAvatar" class="top-nav-avatar" title="个人主页" style="cursor:pointer;">
@@ -2863,6 +2969,16 @@
         document.getElementById('topNavNickname')?.addEventListener('click', () => showPage('profile'));
         document.getElementById('changelogBtn')?.addEventListener('click', () => showPage('changelog'));
         if (isAdmin) document.getElementById('adminPanelBtn')?.addEventListener('click', () => showPage('adminPanel'));
+        // 暗色模式切换
+        const darkBtn = document.getElementById('darkModeBtn');
+        const applyDark = (dark) => {
+            document.body.setAttribute('data-theme', dark ? 'dark' : '');
+            if (darkBtn) darkBtn.textContent = dark ? '☀️' : '🌙';
+            localStorage.setItem('ln-theme', dark ? 'dark' : 'light');
+        };
+        const savedTheme = localStorage.getItem('ln-theme');
+        applyDark(savedTheme === 'dark');
+        darkBtn?.addEventListener('click', () => applyDark(document.body.getAttribute('data-theme') !== 'dark'));
         newGroupBtn.addEventListener('click', createNewGroup);
         newPostBtn.addEventListener('click', () => showPage('createPost'));
         groupSettingsBtn.addEventListener('click', showGroupSettings);
