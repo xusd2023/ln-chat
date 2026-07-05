@@ -40,11 +40,19 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }
+    limits: { fileSize: 500 * 1024 * 1024 * 1024 }  // 最大500GB
 });
 
 app.post('/api/upload', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: '没有收到文件' });
+    // 按用户权限验证文件大小
+    const username = req.body.username || req.query.username;
+    const user = db.users.find(u => u.username === username);
+    const userLimit = (user && user.fileSizeLimit) || 500 * 1024 * 1024 * 1024;
+    if (req.file.size > userLimit) {
+        fs.unlink(req.file.path, () => {});  // 删除超限文件
+        return res.status(413).json({ error: `文件大小超过您的上限 ${fileSizeLabel(userLimit)}` });
+    }
     const fileUrl = `/api/files/${encodeURIComponent(req.file.filename)}`;
     res.json({ success: true, filename: req.file.filename,
         originalName: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
@@ -132,7 +140,7 @@ const ADMIN_USERS = ['admin'];
             bio: '系统管理员',
             role: 'admin',   // user | admin | banned
             canPost: true, canMessage: true, canComment: true, canCreateGroup: true,
-            fileSizeLimit: 5 * 1024 * 1024,  // 5MB
+            fileSizeLimit: 500 * 1024 * 1024 * 1024,  // 500GB
             banned: false
         });
         saveDB();
@@ -145,13 +153,20 @@ const ADMIN_USERS = ['admin'];
             if (u.canMessage === undefined) u.canMessage = !u.banned;
             if (u.canComment === undefined) u.canComment = !u.banned;
             if (u.canCreateGroup === undefined) u.canCreateGroup = !u.banned;
-            if (u.fileSizeLimit === undefined) u.fileSizeLimit = 5 * 1024 * 1024;
+            if (u.fileSizeLimit === undefined) u.fileSizeLimit = 500 * 1024 * 1024 * 1024;  // 500GB
+            if (!u.themeColor) u.themeColor = '#1677ff';
         });
         saveDB();
     }
 })();
 
 // ========== 辅助函数 ==========
+function fileSizeLabel(bytes) {
+    if (!bytes) return '500GB';
+    if (bytes >= 1024*1024*1024) return (bytes/1024/1024/1024).toFixed(1)+'GB';
+    if (bytes >= 1024*1024) return (bytes/1024/1024).toFixed(0)+'MB';
+    return (bytes/1024).toFixed(0)+'KB';
+}
 function getPrivateChatId(userA, userB) { return `private_${userA}_${userB}`; }
 
 function ensurePrivateChat(userA, userB) {
@@ -198,9 +213,9 @@ app.post('/api/register', (req, res) => {
     if (db.users.find(u => u.username === username))
         return res.status(400).json({ success: false, message: '用户名已存在' });
     db.users.push({
-        username, nickname, password, bio: '', profileBgColor: '#1677ff',
+        username, nickname, password, bio: '', profileBgColor: '#1677ff', themeColor: '#1677ff',
         role: 'user', canPost: true, canMessage: true, canComment: true, canCreateGroup: true,
-        fileSizeLimit: 5 * 1024 * 1024, banned: false
+        fileSizeLimit: 500 * 1024 * 1024 * 1024, banned: false  // 500GB
     });
     saveDB();
     res.json({ success: true });
@@ -211,34 +226,38 @@ app.post('/api/login', (req, res) => {
     const user = db.users.find(u => u.username === username && u.password === password);
     if (!user) return res.status(401).json({ success: false, message: '用户名或密码错误' });
     if (user.role === 'banned' || user.banned) return res.status(403).json({ success: false, message: '您的账号已被封禁，无法登录' });
-    res.json({ success: true, nickname: user.nickname, isAdmin: isAdmin(username) });
+    res.json({ success: true, nickname: user.nickname, isAdmin: isAdmin(username), fileSizeLimit: user.fileSizeLimit || 500 * 1024 * 1024 * 1024, themeColor: user.themeColor || '#1677ff' });
 });
 
 app.get('/api/users', (req, res) => {
-    res.json(db.users.map(u => ({ username: u.username, nickname: u.nickname, bio: u.bio || '', avatar: u.avatar || '', profileBgColor: u.profileBgColor || '#1677ff' })));
+    res.json(db.users.map(u => ({ username: u.username, nickname: u.nickname, bio: u.bio || '', avatar: u.avatar || '', profileBgColor: u.profileBgColor || '#1677ff', themeColor: u.themeColor || '#1677ff', fileSizeLimit: u.fileSizeLimit || 500 * 1024 * 1024 * 1024 })));
 });
 
 app.get('/api/users/:username', (req, res) => {
     const user = db.users.find(u => u.username === req.params.username);
     if (!user) return res.status(404).json({ error: '用户不存在' });
-    res.json({ username: user.username, nickname: user.nickname, bio: user.bio || '', avatar: user.avatar || '', profileBgColor: user.profileBgColor || '#1677ff' });
+    res.json({ username: user.username, nickname: user.nickname, bio: user.bio || '', avatar: user.avatar || '', profileBgColor: user.profileBgColor || '#1677ff', themeColor: user.themeColor || '#1677ff', fileSizeLimit: user.fileSizeLimit || 500 * 1024 * 1024 * 1024 });
 });
 
 app.put('/api/users/:username', (req, res) => {
     const user = db.users.find(u => u.username === req.params.username);
     if (!user) return res.status(404).json({ error: '用户不存在' });
-    const { nickname, bio, avatar, password, oldPassword, profileBgColor } = req.body;
+    const { nickname, bio, avatar, password, oldPassword, profileBgColor, themeColor } = req.body;
     if (nickname !== undefined) user.nickname = nickname;
     if (bio !== undefined) user.bio = bio;
     if (avatar !== undefined) user.avatar = avatar;
     if (profileBgColor !== undefined) user.profileBgColor = profileBgColor;
+    if (themeColor !== undefined) {
+        // 简单校验：#RRGGBB 格式
+        if (/^#[0-9a-fA-F]{6}$/.test(themeColor)) user.themeColor = themeColor.toLowerCase();
+    }
     if (password !== undefined) {
         if (user.password !== oldPassword) return res.status(403).json({ error: '旧密码不正确' });
         if (!password || password.length < 4) return res.status(400).json({ error: '新密码至少4个字符' });
         user.password = password;
     }
     saveDB();
-    res.json({ success: true, nickname: user.nickname, bio: user.bio, avatar: user.avatar || '', profileBgColor: user.profileBgColor || '#1677ff' });
+    res.json({ success: true, nickname: user.nickname, bio: user.bio, avatar: user.avatar || '', profileBgColor: user.profileBgColor || '#1677ff', themeColor: user.themeColor || '#1677ff' });
 });
 
 app.get('/api/users/:username/liked-posts', (req, res) => {
@@ -671,7 +690,7 @@ app.get('/api/admin/users', (req, res) => {
         isAdmin: isAdmin(u.username),
         canPost: u.canPost !== false, canMessage: u.canMessage !== false,
         canComment: u.canComment !== false, canCreateGroup: u.canCreateGroup !== false,
-        fileSizeLimit: u.fileSizeLimit || 5 * 1024 * 1024
+        fileSizeLimit: u.fileSizeLimit || 500 * 1024 * 1024 * 1024  // 默认500GB
     })));
 });
 
@@ -692,7 +711,14 @@ app.put('/api/admin/users/:username/permissions', (req, res) => {
     if (canMessage !== undefined) target.canMessage = canMessage;
     if (canComment !== undefined) target.canComment = canComment;
     if (canCreateGroup !== undefined) target.canCreateGroup = canCreateGroup;
-    if (fileSizeLimit !== undefined) target.fileSizeLimit = fileSizeLimit;
+    if (fileSizeLimit !== undefined) {
+        const MIN_FS = 50 * 1024;                    // 50KB
+        const MAX_FS = 500 * 1024 * 1024 * 1024;     // 500GB
+        let fs = parseInt(fileSizeLimit);
+        if (isNaN(fs) || fs < MIN_FS) fs = MIN_FS;
+        if (fs > MAX_FS) fs = MAX_FS;
+        target.fileSizeLimit = fs;
+    }
     saveDB();
     res.json({ success: true });
 });
